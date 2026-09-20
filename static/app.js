@@ -121,6 +121,16 @@ const posX = document.getElementById('pos-x');
 const posY = document.getElementById('pos-y');
 const lblPatchStatus = document.getElementById('lbl-patch-status');
 
+// Photo Selector Elements
+const selectActivePhoto = document.getElementById('select-active-photo');
+const badgePhotoSize = document.getElementById('badge-photo-size');
+const btnUploadFile = document.getElementById('btn-upload-file');
+const fileInput = document.getElementById('file-input');
+const btnTogglePathInput = document.getElementById('btn-toggle-path-input');
+const pathInputBox = document.getElementById('path-input-box');
+const inputCustomPath = document.getElementById('input-custom-path');
+const btnLoadPath = document.getElementById('btn-load-path');
+
 // Initialize
 async function initApp() {
     setupEventListeners();
@@ -138,6 +148,9 @@ async function initApp() {
         state.info = data;
         state.sampleX = Math.round(data.full_width / 2);
         state.sampleY = Math.round(data.full_height / 2);
+        if (badgePhotoSize) badgePhotoSize.textContent = `${data.full_width} × ${data.full_height} px`;
+
+        await loadAvailableImages();
 
         // Load upgraded 4096px overview image
         state.image.onload = () => {
@@ -150,6 +163,92 @@ async function initApp() {
 
     } catch (err) {
         console.error("Initialization failed:", err);
+    }
+}
+
+async function loadAvailableImages() {
+    try {
+        const res = await fetch('/api/list-images');
+        const data = await res.json();
+        if (data.success && selectActivePhoto) {
+            selectActivePhoto.innerHTML = "";
+            data.images.forEach(img => {
+                const opt = document.createElement('option');
+                opt.value = img.path;
+                opt.textContent = `${img.filename} (${img.size_mb} MB)`;
+                if (img.is_current) opt.selected = true;
+                selectActivePhoto.appendChild(opt);
+            });
+            if (data.images.length === 0) {
+                const opt = document.createElement('option');
+                opt.textContent = "No images in data folder";
+                selectActivePhoto.appendChild(opt);
+            }
+        }
+    } catch (e) {
+        console.error("Could not list images:", e);
+    }
+}
+
+async function switchOrUploadPhoto(formDataOrJson) {
+    lblPatchStatus.textContent = "Loading New Photo...";
+    countBtnText.textContent = "Decoding New Orthophoto...";
+    btnCount.disabled = true;
+
+    try {
+        let res;
+        if (formDataOrJson instanceof FormData) {
+            res = await fetch('/api/load-image', {
+                method: 'POST',
+                body: formDataOrJson
+            });
+        } else {
+            res = await fetch('/api/load-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formDataOrJson)
+            });
+        }
+        const data = await res.json();
+
+        if (data.success) {
+            // Reset canvas state
+            state.polygon = [];
+            state.palms = [];
+            state.gaps = [];
+            state.patchLoaded = false;
+            resetStats();
+
+            // Re-fetch info & overview
+            const infoRes = await fetch('/api/info');
+            const infoData = await infoRes.json();
+            state.info = infoData;
+            if (badgePhotoSize) badgePhotoSize.textContent = `${infoData.full_width} × ${infoData.full_height} px`;
+
+            state.sampleX = Math.round(infoData.full_width / 2);
+            state.sampleY = Math.round(infoData.full_height / 2);
+
+            const newImg = new Image();
+            newImg.onload = () => {
+                state.image = newImg;
+                state.imageLoaded = true;
+                fitToScreen();
+                updateLoupe(state.sampleX, state.sampleY, state.sampleRadius);
+                render();
+            };
+            newImg.src = '/api/overview-image?t=' + Date.now();
+
+            await loadAvailableImages();
+            alert("✅ Successfully loaded orthophoto: " + data.filename);
+        } else {
+            alert("Error loading photo: " + (data.error || "Unknown error"));
+        }
+    } catch (err) {
+        console.error("Switch photo failed:", err);
+        alert("Failed to load photo: " + err.message);
+    } finally {
+        btnCount.disabled = false;
+        countBtnText.textContent = "🚀 Run Palm Sensus Count";
     }
 }
 
@@ -485,6 +584,56 @@ function setupEventListeners() {
     // Mode Switcher Tabs
     tabSimple.addEventListener('click', () => switchTab('simple'));
     tabAdvanced.addEventListener('click', () => switchTab('advanced'));
+
+    // Photo Selector & Uploader Listeners
+    if (selectActivePhoto) {
+        selectActivePhoto.addEventListener('change', () => {
+            const chosenPath = selectActivePhoto.value;
+            if (chosenPath) switchOrUploadPhoto({ path: chosenPath });
+        });
+    }
+
+    if (btnUploadFile && fileInput) {
+        btnUploadFile.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                const fd = new FormData();
+                fd.append('file', fileInput.files[0]);
+                switchOrUploadPhoto(fd);
+            }
+        });
+    }
+
+    if (btnTogglePathInput && pathInputBox) {
+        btnTogglePathInput.addEventListener('click', () => {
+            pathInputBox.classList.toggle('hidden');
+        });
+    }
+
+    if (btnLoadPath && inputCustomPath) {
+        btnLoadPath.addEventListener('click', () => {
+            const p = inputCustomPath.value.trim();
+            if (p) switchOrUploadPhoto({ path: p });
+        });
+    }
+
+    // Drag & Drop on Canvas Container
+    container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        container.style.outline = '3px dashed #10b981';
+    });
+    container.addEventListener('dragleave', () => {
+        container.style.outline = 'none';
+    });
+    container.addEventListener('drop', (e) => {
+        e.preventDefault();
+        container.style.outline = 'none';
+        if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+            const fd = new FormData();
+            fd.append('file', e.dataTransfer.files[0]);
+            switchOrUploadPhoto(fd);
+        }
+    });
 
     // 1-Tree Loupe Sample Button
     btnSampleTree.addEventListener('click', () => {

@@ -52,6 +52,44 @@
         <aside class="w-80 md:w-96 bg-slate-900 border-r border-slate-800 flex flex-col justify-between z-10 overflow-y-auto custom-scrollbar">
             <div class="p-4 space-y-4">
 
+                <!-- 0. DRONE PHOTO SELECTOR & UPLOADER -->
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 shadow-md space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                            <span>📸 Drone Orthophoto</span>
+                        </label>
+                        <span id="badge-photo-size" class="text-[10px] text-emerald-400 font-mono">Loading...</span>
+                    </div>
+
+                    <!-- Dropdown of available photos in F:\PalmSentinel-AI\data -->
+                    <select id="select-active-photo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
+                        <option value="">Loading flights...</option>
+                    </select>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <!-- Browse / Upload File -->
+                        <button id="btn-upload-file" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition cursor-pointer">
+                            <span>📁 Browse / Upload</span>
+                        </button>
+                        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.tif,.tiff" class="hidden">
+
+                        <!-- Enter PC Path -->
+                        <button id="btn-toggle-path-input" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition cursor-pointer">
+                            <span>📍 Paste PC Path</span>
+                        </button>
+                    </div>
+
+                    <!-- Collapsible Local Path Box -->
+                    <div id="path-input-box" class="hidden space-y-1.5 pt-1 border-t border-slate-800/80">
+                        <div class="flex items-center space-x-1.5">
+                            <input id="input-custom-path" type="text" placeholder="D:\Photos\ortho.jpg..." class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
+                            <button id="btn-load-path" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold transition">
+                                Load
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 1. LIVE 1-TREE INSPECTION LOUPE CARD (Both Modes) -->
                 <div class="bg-slate-950 p-3 rounded-xl border border-emerald-500/30 shadow-lg space-y-2.5">
                     <div class="flex items-center justify-between">

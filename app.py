@@ -24,6 +24,7 @@ from engine.roi_utils import calculate_polygon_area, calculate_sph, filter_point
 from engine.tiler import TiledProcessor
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # Allow up to 1GB orthophoto uploads
 
 # Default image path (checks local data folder first, falls back to original download)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -109,6 +110,69 @@ def get_image_info():
             for k, v in PRESETS.items()
         }
     })
+
+@app.route("/api/list-images", methods=["GET"])
+def list_available_images():
+    """
+    Lists all orthophotos available in F:\PalmSentinel-AI\data\
+    """
+    data_dir = os.path.join(BASE_DIR, "data")
+    os.makedirs(data_dir, exist_ok=True)
+    images = []
+    valid_exts = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+
+    if os.path.exists(data_dir):
+        for f in os.listdir(data_dir):
+            ext = os.path.splitext(f)[1].lower()
+            if ext in valid_exts:
+                full_p = os.path.join(data_dir, f)
+                sz = round(os.path.getsize(full_p) / (1024 * 1024), 2)
+                images.append({
+                    "filename": f,
+                    "path": full_p,
+                    "size_mb": sz,
+                    "is_current": (os.path.normpath(full_p) == os.path.normpath(CACHE.get("image_path", "")))
+                })
+    return jsonify({"success": True, "images": images, "current_image": CACHE.get("image_path")})
+
+@app.route("/api/load-image", methods=["POST"])
+def load_image_endpoint():
+    """
+    Loads an image either by direct file upload OR by local PC path!
+    """
+    # 1. Direct File Upload
+    if "file" in request.files:
+        f = request.files["file"]
+        if f and f.filename:
+            data_dir = os.path.join(BASE_DIR, "data")
+            os.makedirs(data_dir, exist_ok=True)
+            save_path = os.path.join(data_dir, f.filename)
+            f.save(save_path)
+            if get_or_load_image(save_path):
+                return jsonify({
+                    "success": True,
+                    "message": f"Uploaded & Loaded {f.filename}",
+                    "filename": f.filename,
+                    "path": save_path
+                })
+            else:
+                return jsonify({"success": False, "error": "Failed to decode uploaded image."}), 400
+
+    # 2. Local PC Path
+    data = request.json or {}
+    path = data.get("path", "").strip().strip('"').strip("'")
+    if path and os.path.exists(path):
+        if get_or_load_image(path):
+            return jsonify({
+                "success": True,
+                "message": f"Loaded {os.path.basename(path)}",
+                "filename": os.path.basename(path),
+                "path": path
+            })
+        else:
+            return jsonify({"success": False, "error": "Failed to decode image at specified path."}), 400
+
+    return jsonify({"success": False, "error": "Image path does not exist on your PC."}), 400
 
 @app.route("/api/overview-image", methods=["GET"])
 def get_overview_image():
