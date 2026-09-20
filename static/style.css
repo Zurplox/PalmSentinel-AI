@@ -1,0 +1,48 @@
+/* Custom styles for PalmSensus AI */
+
+.tool-btn {
+    background-color: transparent;
+    color: #94a3b8;
+    border: 1px solid transparent;
+}
+
+.tool-btn:hover {
+    background-color: #1e293b;
+    color: #f8fafc;
+}
+
+.tool-btn.active {
+    background-color: #064e3b;
+    color: #6ee7b7;
+    border-color: #059669;
+    font-weight: 600;
+}
+
+.export-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* Range input accent color */
+input[type="range"] {
+    cursor: pointer;
+}

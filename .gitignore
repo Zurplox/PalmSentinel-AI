@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+
+# Large Datasets & Drone Images
+*.tif
+*.tiff
+*.jpg
+*.jpeg
+*.png
+!static/*.png
+!static/*.jpg
+
+# Outputs
+output/
+*.csv
+*.geojson
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
