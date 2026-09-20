@@ -19,11 +19,5 @@ try {
     Exit 1
 }
 
-# Open browser after 2 seconds
-Start-Job -ScriptBlock {
-    Start-Sleep -Seconds 2
-    Start-Process "http://127.0.0.1:5000"
-} | Out-Null
-
-Write-Host "[*] Starting local web server on http://127.0.0.1:5000 ..." -ForegroundColor Cyan
-python app.py
+Write-Host "[*] Starting PalmSentinel Native Desktop Application..." -ForegroundColor Cyan
+python desktop_app.py

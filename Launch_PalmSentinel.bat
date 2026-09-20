@@ -21,13 +21,7 @@ if errorlevel 1 (
 )
 
 echo [OK] Python detected!
-echo [*] Starting PalmSentinel local server...
+echo [*] Starting PalmSentinel Native Desktop Application...
 echo.
 
-:: Launch browser in background after 2 seconds
-start "" cmd /c "timeout /t 2 /nobreak >nul && start http://127.0.0.1:5000"
-
-:: Start the Flask app
-python app.py
-
-pause
+python desktop_app.py
