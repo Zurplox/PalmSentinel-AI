@@ -1,5 +1,6 @@
 /**
- * PalmSensus AI — Frontend Canvas & Interactive Controller
+ * PalmSentinel AI Pro — Frontend Canvas & Interactive Controller
+ * Featuring: Simple/Advanced Modes, Dynamic High-Res Viewport, and Live 1-Tree Loupe
  */
 
 // Application State
@@ -16,8 +17,15 @@ const state = {
     startPanX: 0,
     startPanY: 0,
 
-    // Interaction Mode: 'poly', 'box', 'edit'
+    // Dynamic High-Res Viewport Patch
+    patchImg: new Image(),
+    patchLoaded: false,
+    patchBBox: null, // { x1, y1, x2, y2 } in full coordinates
+    patchTimer: null,
+
+    // Interaction Mode: 'poly', 'box', 'edit', 'sample'
     currentTool: 'poly',
+    currentTab: 'simple', // 'simple' or 'advanced'
 
     // ROI Polygon coordinates in overview image space: [{x, y}, ...]
     polygon: [],
@@ -29,8 +37,17 @@ const state = {
     boxCurrent: null,
     isDrawingBox: false,
 
-    // Detected palms: [{id, x, y, radius, confidence, full_x, full_y}, ...]
+    // 1-Tree Loupe State
+    sampleX: 4500, // full coords
+    sampleY: 4500,
+    sampleRadius: 32, // native px
+    isSamplingMode: false,
+
+    // Detected palms & Agro-analytics
     palms: [],
+    gaps: [],
+    showMissingPalms: false,
+    showDensityHeatmap: false,
     
     // UI Options
     showNumbers: true,
@@ -43,15 +60,26 @@ const canvas = document.getElementById('main-canvas');
 const ctx = canvas.getContext('2d');
 const container = document.getElementById('canvas-container');
 
-// Elements - Badges & Labels
-const lblFilename = document.getElementById('lbl-filename');
-const lblResolution = document.getElementById('lbl-resolution');
-const lblZoom = document.getElementById('lbl-zoom-level');
-const posX = document.getElementById('pos-x');
-const posY = document.getElementById('pos-y');
-const toolInstruction = document.getElementById('tool-instruction');
+// Tabs
+const tabSimple = document.getElementById('tab-simple');
+const tabAdvanced = document.getElementById('tab-advanced');
+const sectionSimple = document.getElementById('section-simple');
+const sectionAdvanced = document.getElementById('section-advanced');
 
-// Elements - Sliders & Values
+// Loupe Elements
+const loupeImg = document.getElementById('loupe-img');
+const loupeCircle = document.getElementById('loupe-circle');
+const loupeStatus = document.getElementById('loupe-status');
+const loupeCoords = document.getElementById('loupe-coords');
+const btnSampleTree = document.getElementById('btn-sample-tree');
+
+// Simple Sliders
+const sliderSimpleSize = document.getElementById('slider-simple-size');
+const valSimpleSize = document.getElementById('val-simple-size');
+const sliderSimpleStrict = document.getElementById('slider-simple-strict');
+const valSimpleStrict = document.getElementById('val-simple-strict');
+
+// Advanced Sliders
 const sliderBlur = document.getElementById('slider-blur');
 const valBlur = document.getElementById('val-blur');
 const sliderSpacing = document.getElementById('slider-spacing');
@@ -60,35 +88,38 @@ const sliderThresh = document.getElementById('slider-thresh');
 const valThresh = document.getElementById('val-thresh');
 const sliderGsd = document.getElementById('slider-gsd');
 const valGsd = document.getElementById('val-gsd');
-const selectPreset = document.getElementById('select-preset');
-const inputBlockName = document.getElementById('input-block-name');
 
-// Elements - Buttons
+// Actions & Toggles
 const btnCount = document.getElementById('btn-count');
 const countSpinner = document.getElementById('count-spinner');
 const countBtnText = document.getElementById('count-btn-text');
 const btnClearRoi = document.getElementById('btn-clear-roi');
-const btnExportCsv = document.getElementById('btn-export-csv');
-const btnExportGeojson = document.getElementById('btn-export-geojson');
-const btnExportImg = document.getElementById('btn-export-img');
-const btnFitScreen = document.getElementById('btn-fit-screen');
-const btnResetView = document.getElementById('btn-reset-view');
-const btnZoomIn = document.getElementById('btn-zoom-in');
-const btnZoomOut = document.getElementById('btn-zoom-out');
-
-// Elements - Analytics Card
-const statPalms = document.getElementById('stat-palms');
-const statArea = document.getElementById('stat-area');
-const statSph = document.getElementById('stat-sph');
-const statStatus = document.getElementById('stat-status');
-const statTime = document.getElementById('stat-time');
+const inputBlockName = document.getElementById('input-block-name');
+const chkMissingPalms = document.getElementById('chk-missing-palms');
+const chkDensityHeatmap = document.getElementById('chk-density-heatmap');
 const chkShowNumbers = document.getElementById('chk-show-numbers');
 const chkShowCircles = document.getElementById('chk-show-circles');
+const btnNativeRes = document.getElementById('btn-native-res');
 
 // Tool Buttons
 const toolPolyBtn = document.getElementById('tool-poly');
 const toolBoxBtn = document.getElementById('tool-box');
 const toolEditBtn = document.getElementById('tool-edit');
+const toolInstruction = document.getElementById('tool-instruction');
+
+// Analytics Card
+const statPalms = document.getElementById('stat-palms');
+const statArea = document.getElementById('stat-area');
+const statSph = document.getElementById('stat-sph');
+const statStatus = document.getElementById('stat-status');
+const statTime = document.getElementById('stat-time');
+const statGapsCard = document.getElementById('stat-gaps-card');
+const statGaps = document.getElementById('stat-gaps');
+const statMortality = document.getElementById('stat-mortality');
+const lblZoom = document.getElementById('lbl-zoom-level');
+const posX = document.getElementById('pos-x');
+const posY = document.getElementById('pos-y');
+const lblPatchStatus = document.getElementById('lbl-patch-status');
 
 // Initialize
 async function initApp() {
@@ -105,13 +136,14 @@ async function initApp() {
         }
 
         state.info = data;
-        lblFilename.textContent = data.filename;
-        lblResolution.textContent = `${data.full_width} × ${data.full_height} px`;
+        state.sampleX = Math.round(data.full_width / 2);
+        state.sampleY = Math.round(data.full_height / 2);
 
-        // Load overview image
+        // Load upgraded 4096px overview image
         state.image.onload = () => {
             state.imageLoaded = true;
             fitToScreen();
+            updateLoupe(state.sampleX, state.sampleY, state.sampleRadius);
             render();
         };
         state.image.src = '/api/overview-image';
@@ -160,7 +192,130 @@ function imageToScreen(ix, iy) {
     };
 }
 
-// Render loop
+// -------------------------------------------------------------
+// DYNAMIC HIGH-RES VIEWPORT ENGINE (Eliminates Blurriness)
+// -------------------------------------------------------------
+function scheduleViewportPatch() {
+    if (!state.info || !state.imageLoaded) return;
+    clearTimeout(state.patchTimer);
+
+    // Only load high-res patch if user is zoomed in past 0.35x
+    if (state.zoom < 0.35) {
+        state.patchLoaded = false;
+        lblPatchStatus.textContent = "Overview Mode";
+        return;
+    }
+
+    lblPatchStatus.textContent = "Fetching 100% Native Pixels...";
+
+    state.patchTimer = setTimeout(async () => {
+        const topLeft = screenToImage(0, 0);
+        const bottomRight = screenToImage(canvas.width, canvas.height);
+
+        const scale = state.info.scale_factor;
+        const x1 = Math.max(0, Math.round(topLeft.x * scale));
+        const y1 = Math.max(0, Math.round(topLeft.y * scale));
+        const x2 = Math.min(state.info.full_width, Math.round(bottomRight.x * scale));
+        const y2 = Math.min(state.info.full_height, Math.round(bottomRight.y * scale));
+
+        if (x2 <= x1 || y2 <= y1) return;
+
+        const url = `/api/viewport-patch?x1=${x1}&y1=${y1}&x2=${x2}&y2=${y2}&max_dim=2560`;
+        const tempImg = new Image();
+        tempImg.onload = () => {
+            state.patchImg = tempImg;
+            state.patchBBox = { x1, y1, x2, y2 };
+            state.patchLoaded = true;
+            lblPatchStatus.textContent = "⚡ Razor-Sharp Native";
+            render();
+        };
+        tempImg.src = url;
+    }, 280);
+}
+
+// -------------------------------------------------------------
+// 1-TREE LIVE INSPECTION LOUPE ENGINE
+// -------------------------------------------------------------
+function updateLoupe(fullX, fullY, radiusPx) {
+    state.sampleX = fullX;
+    state.sampleY = fullY;
+    state.sampleRadius = radiusPx;
+
+    loupeImg.src = `/api/tree-sample?x=${fullX}&y=${fullY}&size=260&coord_scale=full`;
+    loupeCoords.textContent = `${fullX}, ${fullY}`;
+    updateLoupeCircleDisplay();
+}
+
+function updateLoupeCircleDisplay() {
+    // 260px is native crop size. Map to container dimensions
+    const containerW = loupeImg.parentElement.clientWidth || 320;
+    const scale = containerW / 260.0;
+    const circleDiameter = state.sampleRadius * 2 * scale;
+
+    loupeCircle.style.width = `${circleDiameter}px`;
+    loupeCircle.style.height = `${circleDiameter}px`;
+}
+
+// Auto-Calibrate on Click
+async function autoCalibrateAtPoint(screenX, screenY) {
+    const pt = screenToImage(screenX, screenY);
+    const fullX = Math.round(pt.x * state.info.scale_factor);
+    const fullY = Math.round(pt.y * state.info.scale_factor);
+
+    loupeStatus.textContent = "Calibrating...";
+    btnSampleTree.classList.add("animate-pulse");
+
+    try {
+        const res = await fetch('/api/auto-calibrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ x: fullX, y: fullY, coord_scale: 'full' })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            const cal = data.calibrated_tree;
+            const rec = data.recommended_parameters;
+
+            state.sampleRadius = rec.crown_radius_px;
+            sliderSimpleSize.value = rec.crown_radius_px;
+            updateSimpleSizeLabel(rec.crown_radius_px);
+
+            // Sync with advanced sliders
+            sliderBlur.value = rec.blur_ksize;
+            valBlur.textContent = `${rec.blur_ksize} px`;
+            sliderSpacing.value = rec.min_distance_px;
+            valSpacing.textContent = `${rec.min_distance_px} px`;
+            sliderThresh.value = rec.vegetation_threshold;
+            valThresh.textContent = rec.vegetation_threshold;
+
+            updateLoupe(fullX, fullY, rec.crown_radius_px);
+            loupeStatus.textContent = cal.category;
+
+            // Turn off sampling mode
+            state.isSamplingMode = false;
+            btnSampleTree.classList.remove("bg-emerald-600", "text-white", "animate-pulse");
+            btnSampleTree.textContent = "🎯 Click on Map to Sample a Tree";
+            setTool('poly');
+        }
+    } catch (err) {
+        console.error("Auto calibrate failed:", err);
+    }
+}
+
+function updateSimpleSizeLabel(r) {
+    if (r < 24) {
+        valSimpleSize.textContent = `Young TBM (${r} px)`;
+    } else if (r < 38) {
+        valSimpleSize.textContent = `Mature TM (${r} px)`;
+    } else {
+        valSimpleSize.textContent = `Large Canopy (${r} px)`;
+    }
+}
+
+// -------------------------------------------------------------
+// MAIN CANVAS RENDER LOOP
+// -------------------------------------------------------------
 function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -176,10 +331,20 @@ function render() {
     ctx.translate(state.panX, state.panY);
     ctx.scale(state.zoom, state.zoom);
 
-    // 1. Draw Drone Orthophoto Overview
+    // 1. Draw Overview Orthophoto
     ctx.drawImage(state.image, 0, 0);
 
-    // 2. Draw Polygon ROI (if exists)
+    // 2. Draw Dynamic High-Res Viewport Patch (Sharp Native Overlay)
+    if (state.patchLoaded && state.patchImg && state.patchBBox) {
+        const scale = state.info.scale_factor;
+        const px = state.patchBBox.x1 / scale;
+        const py = state.patchBBox.y1 / scale;
+        const pw = (state.patchBBox.x2 - state.patchBBox.x1) / scale;
+        const ph = (state.patchBBox.y2 - state.patchBBox.y1) / scale;
+        ctx.drawImage(state.patchImg, px, py, pw, ph);
+    }
+
+    // 3. Draw Polygon ROI (if exists)
     if (state.polygon.length > 0) {
         ctx.beginPath();
         ctx.moveTo(state.polygon[0].x, state.polygon[0].y);
@@ -187,7 +352,6 @@ function render() {
             ctx.lineTo(state.polygon[i].x, state.polygon[i].y);
         }
 
-        // If in polygon drawing mode and have a hover point, draw line to it
         if (state.isDrawingPoly && state.hoverPoint) {
             ctx.lineTo(state.hoverPoint.x, state.hoverPoint.y);
         } else if (!state.isDrawingPoly && state.polygon.length >= 3) {
@@ -200,7 +364,7 @@ function render() {
         ctx.lineWidth = 2.5 / state.zoom;
         ctx.stroke();
 
-        // Draw Vertex handles
+        // Vertex handles
         ctx.fillStyle = "#34d399";
         for (let p of state.polygon) {
             ctx.beginPath();
@@ -212,7 +376,7 @@ function render() {
         }
     }
 
-    // 3. Draw Box being dragged
+    // 4. Draw Box being dragged
     if (state.isDrawingBox && state.boxStart && state.boxCurrent) {
         const bx = Math.min(state.boxStart.x, state.boxCurrent.x);
         const by = Math.min(state.boxStart.y, state.boxCurrent.y);
@@ -226,7 +390,24 @@ function render() {
         ctx.strokeRect(bx, by, bw, bh);
     }
 
-    // 4. Draw Detected Palm Markers
+    // 5. Density Heatmap Overlay (Optional Feature)
+    if (state.showDensityHeatmap && state.palms.length > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        for (let p of state.palms) {
+            const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, (p.radius || 15) * 1.6);
+            grad.addColorStop(0, "rgba(16, 185, 129, 0.8)");
+            grad.addColorStop(0.7, "rgba(245, 158, 11, 0.4)");
+            grad.addColorStop(1, "rgba(239, 68, 68, 0)");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, (p.radius || 15) * 1.6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // 6. Draw Detected Palm Markers
     if (state.palms.length > 0) {
         for (let i = 0; i < state.palms.length; i++) {
             const p = state.palms[i];
@@ -262,40 +443,106 @@ function render() {
         }
     }
 
+    // 7. Missing Tree / Vacant Spot Indicators (Titik Sisipan)
+    if (state.showMissingPalms && state.gaps.length > 0) {
+        for (let g of state.gaps) {
+            ctx.beginPath();
+            ctx.arc(g.x, g.y, 14 / state.zoom, 0, Math.PI * 2);
+            ctx.strokeStyle = "#f59e0b";
+            ctx.lineWidth = 2.0 / state.zoom;
+            ctx.setLineDash([4 / state.zoom, 4 / state.zoom]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Yellow X mark
+            const s = 6 / state.zoom;
+            ctx.strokeStyle = "#fbbf24";
+            ctx.beginPath();
+            ctx.moveTo(g.x - s, g.y - s);
+            ctx.lineTo(g.x + s, g.y + s);
+            ctx.moveTo(g.x + s, g.y - s);
+            ctx.lineTo(g.x - s, g.y + s);
+            ctx.stroke();
+        }
+    }
+
+    // 8. Sample Point Marker (The tree currently in the Loupe)
+    if (state.info) {
+        const sx = state.sampleX / state.info.scale_factor;
+        const sy = state.sampleY / state.info.scale_factor;
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2.0 / state.zoom;
+        ctx.strokeRect(sx - 12 / state.zoom, sy - 12 / state.zoom, 24 / state.zoom, 24 / state.zoom);
+    }
+
     ctx.restore();
 }
 
-// Event Listeners
+// -------------------------------------------------------------
+// EVENT LISTENERS & CONTROLS
+// -------------------------------------------------------------
 function setupEventListeners() {
-    // Zoom Buttons
-    btnZoomIn.addEventListener('click', () => zoomBy(1.25));
-    btnZoomOut.addEventListener('click', () => zoomBy(0.8));
-    btnResetView.addEventListener('click', () => { state.zoom = 1.0; state.panX = 0; state.panY = 0; updateZoomLabel(); render(); });
-    btnFitScreen.addEventListener('click', fitToScreen);
+    // Mode Switcher Tabs
+    tabSimple.addEventListener('click', () => switchTab('simple'));
+    tabAdvanced.addEventListener('click', () => switchTab('advanced'));
 
-    // Sliders
+    // 1-Tree Loupe Sample Button
+    btnSampleTree.addEventListener('click', () => {
+        state.isSamplingMode = !state.isSamplingMode;
+        if (state.isSamplingMode) {
+            btnSampleTree.classList.add("bg-emerald-600", "text-white");
+            btnSampleTree.textContent = "👆 Now Click Any Palm Tree on the Map";
+            canvas.style.cursor = "crosshair";
+        } else {
+            btnSampleTree.classList.remove("bg-emerald-600", "text-white");
+            btnSampleTree.textContent = "🎯 Click on Map to Sample a Tree";
+            canvas.style.cursor = "default";
+        }
+    });
+
+    // Simple Size Slider
+    sliderSimpleSize.addEventListener('input', () => {
+        const r = parseInt(sliderSimpleSize.value);
+        state.sampleRadius = r;
+        updateSimpleSizeLabel(r);
+        updateLoupeCircleDisplay();
+
+        // Sync with advanced sliders
+        const recBlur = Math.round(r * 0.9) | 1;
+        sliderBlur.value = recBlur;
+        valBlur.textContent = `${recBlur} px`;
+
+        const recSpacing = Math.round(r * 2.1);
+        sliderSpacing.value = recSpacing;
+        valSpacing.textContent = `${recSpacing} px`;
+    });
+
+    // Simple Strictness Slider
+    sliderSimpleStrict.addEventListener('input', () => {
+        const v = parseInt(sliderSimpleStrict.value);
+        const labels = ["Very Sensitive", "Relaxed", "Balanced", "Strict", "Very Strict"];
+        valSimpleStrict.textContent = labels[v - 1];
+
+        // Map 1-5 to vegetation sensitivity (65 - 90)
+        const mappedThresh = 60 + v * 6;
+        sliderThresh.value = mappedThresh;
+        valThresh.textContent = mappedThresh;
+    });
+
+    // Advanced Sliders
     sliderBlur.addEventListener('input', () => { valBlur.textContent = `${sliderBlur.value} px`; });
-    sliderSpacing.addEventListener('input', () => { valSpacing.textContent = `${sliderSpacing.value} px`; });
+    sliderSpacing.addEventListener('input', () => { 
+        valSpacing.textContent = `${sliderSpacing.value} px`;
+        // Sync back to simple size
+        const approxR = Math.round(parseInt(sliderSpacing.value) / 2.1);
+        sliderSimpleSize.value = Math.max(18, Math.min(55, approxR));
+        state.sampleRadius = approxR;
+        updateLoupeCircleDisplay();
+    });
     sliderThresh.addEventListener('input', () => { valThresh.textContent = sliderThresh.value; });
     sliderGsd.addEventListener('input', () => { 
         valGsd.textContent = `${sliderGsd.value} cm/px`;
         recalcMetrics();
-    });
-
-    // Preset Selection
-    selectPreset.addEventListener('change', () => {
-        const p = selectPreset.value;
-        if (state.info && state.info.presets && state.info.presets[p]) {
-            const conf = state.info.presets[p];
-            sliderBlur.value = conf.blur_ksize;
-            valBlur.textContent = `${conf.blur_ksize} px`;
-
-            sliderSpacing.value = conf.min_distance_px;
-            valSpacing.textContent = `${conf.min_distance_px} px`;
-
-            sliderThresh.value = conf.vegetation_threshold;
-            valThresh.textContent = conf.vegetation_threshold;
-        }
     });
 
     // Tool Switchers
@@ -303,38 +550,79 @@ function setupEventListeners() {
     toolBoxBtn.addEventListener('click', () => setTool('box'));
     toolEditBtn.addEventListener('click', () => setTool('edit'));
 
-    // Clear ROI
+    // Toggles
+    chkMissingPalms.addEventListener('change', () => {
+        state.showMissingPalms = chkMissingPalms.checked;
+        if (state.showMissingPalms && state.gaps.length === 0 && state.palms.length > 0) {
+            fetchGaps();
+        }
+        render();
+    });
+
+    chkDensityHeatmap.addEventListener('change', () => {
+        state.showDensityHeatmap = chkDensityHeatmap.checked;
+        render();
+    });
+
+    chkShowNumbers.addEventListener('change', () => { state.showNumbers = chkShowNumbers.checked; render(); });
+    chkShowCircles.addEventListener('change', () => { state.showCircles = chkShowCircles.checked; render(); });
+
+    // Buttons
+    btnCount.addEventListener('click', runCount);
     btnClearRoi.addEventListener('click', () => {
         state.polygon = [];
         state.isDrawingPoly = false;
         state.hoverPoint = null;
         state.palms = [];
+        state.gaps = [];
         resetStats();
         render();
     });
 
-    // Display Toggles
-    chkShowNumbers.addEventListener('change', () => { state.showNumbers = chkShowNumbers.checked; render(); });
-    chkShowCircles.addEventListener('change', () => { state.showCircles = chkShowCircles.checked; render(); });
+    btnFitScreen.addEventListener('click', fitToScreen);
+    btnNativeRes.addEventListener('click', () => {
+        state.zoom = 1.0;
+        updateZoomLabel();
+        scheduleViewportPatch();
+        render();
+    });
 
-    // Mouse Interactions on Canvas
+    document.getElementById('btn-zoom-in').addEventListener('click', () => zoomBy(1.25));
+    document.getElementById('btn-zoom-out').addEventListener('click', () => zoomBy(0.8));
+
+    // Exports
+    document.getElementById('btn-export-csv').addEventListener('click', exportCsv);
+    document.getElementById('btn-export-geojson').addEventListener('click', exportGeojson);
+    document.getElementById('btn-export-img').addEventListener('click', exportAnnotatedImage);
+
+    // Mouse Interactions
     canvas.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     canvas.addEventListener('dblclick', handleDoubleClick);
+}
 
-    // Execute Count Button
-    btnCount.addEventListener('click', runCount);
+function switchTab(tab) {
+    state.currentTab = tab;
+    tabSimple.classList.toggle('active', tab === 'simple');
+    tabAdvanced.classList.toggle('active', tab === 'advanced');
 
-    // Export Buttons
-    btnExportCsv.addEventListener('click', exportCsv);
-    btnExportGeojson.addEventListener('click', exportGeojson);
-    btnExportImg.addEventListener('click', exportAnnotatedImage);
+    if (tab === 'simple') {
+        sectionSimple.classList.remove('hidden');
+        sectionAdvanced.classList.add('hidden');
+    } else {
+        sectionSimple.classList.add('hidden');
+        sectionAdvanced.classList.remove('hidden');
+    }
 }
 
 function setTool(tool) {
     state.currentTool = tool;
+    state.isSamplingMode = false;
+    btnSampleTree.classList.remove("bg-emerald-600", "text-white");
+    btnSampleTree.textContent = "🎯 Click on Map to Sample a Tree";
+
     toolPolyBtn.classList.toggle('active', tool === 'poly');
     toolBoxBtn.classList.toggle('active', tool === 'box');
     toolEditBtn.classList.toggle('active', tool === 'edit');
@@ -362,6 +650,7 @@ function zoomBy(factor) {
     state.panX = cx - pt.x * state.zoom;
     state.panY = cy - pt.y * state.zoom;
     updateZoomLabel();
+    scheduleViewportPatch();
     render();
 }
 
@@ -379,6 +668,7 @@ function handleWheel(e) {
     state.panX = mouseX - ptBefore.x * state.zoom;
     state.panY = mouseY - ptBefore.y * state.zoom;
     updateZoomLabel();
+    scheduleViewportPatch();
     render();
 }
 
@@ -387,6 +677,12 @@ function handleMouseDown(e) {
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
     const pt = screenToImage(mx, my);
+
+    // If in Sampling Mode: click samples the tree into the loupe
+    if (state.isSamplingMode && e.button === 0) {
+        autoCalibrateAtPoint(mx, my);
+        return;
+    }
 
     // Pan with Middle Mouse Button, Spacebar, or Right Button
     if (e.button === 1 || e.button === 2 || e.shiftKey) {
@@ -404,7 +700,6 @@ function handleMouseDown(e) {
                 state.polygon = [pt];
                 state.isDrawingPoly = true;
             } else {
-                // Check if clicked close to initial point -> close polygon
                 const first = state.polygon[0];
                 const dist = Math.hypot(pt.x - first.x, pt.y - first.y);
                 if (state.polygon.length >= 3 && dist < (15 / state.zoom)) {
@@ -431,7 +726,6 @@ function handleMouseMove(e) {
     const my = e.clientY - rect.top;
     const pt = screenToImage(mx, my);
 
-    // Update coordinate indicator
     if (state.info) {
         const fullX = Math.round(pt.x * state.info.scale_factor);
         const fullY = Math.round(pt.y * state.info.scale_factor);
@@ -458,7 +752,8 @@ function handleMouseMove(e) {
 function handleMouseUp(e) {
     if (state.isPanning) {
         state.isPanning = false;
-        canvas.style.cursor = state.currentTool === 'edit' ? "pointer" : "crosshair";
+        canvas.style.cursor = state.isSamplingMode ? "crosshair" : (state.currentTool === 'edit' ? "pointer" : "crosshair");
+        scheduleViewportPatch();
     }
 
     if (state.isDrawingBox && state.boxStart && state.boxCurrent) {
@@ -468,7 +763,6 @@ function handleMouseUp(e) {
         const x2 = Math.max(state.boxStart.x, state.boxCurrent.x);
         const y2 = Math.max(state.boxStart.y, state.boxCurrent.y);
 
-        // Convert box to polygon vertices
         if (Math.abs(x2 - x1) > 5 && Math.abs(y2 - y1) > 5) {
             state.polygon = [
                 { x: x1, y: y1 },
@@ -491,7 +785,7 @@ function handleDoubleClick(e) {
     }
 }
 
-// Manual marker edit: add or delete
+// Manual marker edit
 function handleManualMarkerEdit(pt) {
     const clickRadius = 15 / state.zoom;
     let deleteIdx = -1;
@@ -506,15 +800,13 @@ function handleManualMarkerEdit(pt) {
     }
 
     if (deleteIdx !== -1) {
-        // Delete palm
         state.palms.splice(deleteIdx, 1);
     } else {
-        // Add new palm
         const newPalm = {
             id: state.palms.length + 1,
             x: Math.round(pt.x),
             y: Math.round(pt.y),
-            radius: 8,
+            radius: state.sampleRadius / state.info.scale_factor,
             confidence: 1.0,
             full_x: Math.round(pt.x * state.info.scale_factor),
             full_y: Math.round(pt.y * state.info.scale_factor)
@@ -522,14 +814,12 @@ function handleManualMarkerEdit(pt) {
         state.palms.push(newPalm);
     }
 
-    // Re-index IDs
     state.palms.forEach((p, idx) => p.id = idx + 1);
-
     recalcMetrics();
     render();
 }
 
-// Run Sensus Count via Backend API
+// Execute Sensus Count
 async function runCount() {
     if (!state.info) return;
 
@@ -543,7 +833,6 @@ async function runCount() {
         coord_scale: "overview",
         polygon: polygonPayload,
         gsd_cm: parseFloat(sliderGsd.value),
-        preset: selectPreset.value,
         blur_ksize: parseInt(sliderBlur.value),
         dilation_radius: Math.round(parseInt(sliderSpacing.value) * 0.45),
         min_distance_px: parseInt(sliderSpacing.value),
@@ -566,6 +855,10 @@ async function runCount() {
             statStatus.textContent = data.sph_info.status;
             statTime.textContent = `${data.process_time_s}s`;
 
+            if (state.showMissingPalms) {
+                fetchGaps();
+            }
+
             render();
         } else {
             alert("Detection error: " + data.error);
@@ -580,10 +873,38 @@ async function runCount() {
     }
 }
 
+// Fetch Missing Palms / Grid Gaps
+async function fetchGaps() {
+    if (state.palms.length < 5 || state.polygon.length < 3) return;
+
+    const payload = {
+        palms: state.palms,
+        polygon: state.polygon.map(p => [p.x, p.y]),
+        expected_spacing: parseFloat(sliderSpacing.value) / state.info.scale_factor
+    };
+
+    try {
+        const res = await fetch('/api/detect-gaps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            state.gaps = data.gaps;
+            statGapsCard.classList.remove('hidden');
+            statGaps.textContent = data.total_gaps;
+            statMortality.textContent = `${data.mortality_percent}%`;
+            render();
+        }
+    } catch (err) {
+        console.error("Fetch gaps failed:", err);
+    }
+}
+
 function recalcMetrics() {
     statPalms.textContent = state.palms.length.toLocaleString();
     if (state.polygon.length >= 3) {
-        // Approximate area from overview polygon
         let areaPx = 0;
         for (let i = 0; i < state.polygon.length; i++) {
             let j = (i + 1) % state.polygon.length;
@@ -612,6 +933,7 @@ function resetStats() {
     statSph.textContent = "0 SPH";
     statStatus.textContent = "Draw an area and click 'Run Palm Sensus Count'.";
     statTime.textContent = "0.0s";
+    statGapsCard.classList.add('hidden');
 }
 
 // Export Handlers

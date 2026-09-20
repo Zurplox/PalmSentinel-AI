@@ -1,4 +1,4 @@
-/* Custom styles for PalmSensus AI */
+/* Custom styles for PalmSentinel AI Pro */
 
 .tool-btn {
     background-color: transparent;
@@ -14,6 +14,18 @@
 .tool-btn.active {
     background-color: #064e3b;
     color: #6ee7b7;
+    border-color: #059669;
+    font-weight: 600;
+}
+
+.tab-btn {
+    color: #94a3b8;
+    border: 1px solid transparent;
+}
+
+.tab-btn.active {
+    background-color: #064e3b;
+    color: #34d399;
     border-color: #059669;
     font-weight: 600;
 }
@@ -45,4 +57,10 @@
 /* Range input accent color */
 input[type="range"] {
     cursor: pointer;
+}
+
+/* 1-Tree Loupe Animation */
+#loupe-circle {
+    transition: width 0.1s ease, height 0.1s ease;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
 }

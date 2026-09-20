@@ -63,8 +63,8 @@ def get_or_load_image(path: Optional[str] = None) -> bool:
     CACHE["full_width"] = w
     CACHE["full_height"] = h
 
-    # Create scaled overview for fluid UI interaction (max 2048 px)
-    max_side = 2048
+    # Create scaled overview for fluid UI interaction (upgraded to 4096 px for sharp clarity)
+    max_side = 4096
     scale = max_side / max(h, w)
     overview_w = int(round(w * scale))
     overview_h = int(round(h * scale))
@@ -330,12 +330,230 @@ def export_annotated_image():
         down_scale = max_export / max(ch, cw)
         crop = cv2.resize(crop, (int(cw * down_scale), int(ch * down_scale)), interpolation=cv2.INTER_AREA)
 
-    _, buffer = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 90])
-    return Response(
-        buffer.tobytes(),
-        mimetype="image/jpeg",
-        headers={"Content-Disposition": "attachment;filename=annotated_sensus_block.jpg"}
-    )
+@app.route("/api/viewport-patch", methods=["GET"])
+def get_viewport_patch():
+    """
+    Returns a crisp 100% native full-resolution image crop for the visible viewport.
+    Eliminates all blurriness when zoomed in!
+    """
+    if not get_or_load_image():
+        return "Image not loaded", 500
+
+    try:
+        x1 = max(0, int(float(request.args.get("x1", 0))))
+        y1 = max(0, int(float(request.args.get("y1", 0))))
+        x2 = min(CACHE["full_width"], int(float(request.args.get("x2", CACHE["full_width"]))))
+        y2 = min(CACHE["full_height"], int(float(request.args.get("y2", CACHE["full_height"]))))
+        
+        # Max resolution to return in single patch (for bandwidth and speed)
+        max_dim = int(request.args.get("max_dim", 2560))
+
+        if x2 <= x1 or y2 <= y1:
+            return "Invalid bounds", 400
+
+        crop = CACHE["full_image"][y1:y2, x1:x2]
+        ch, cw = crop.shape[:2]
+
+        if max(ch, cw) > max_dim:
+            s = max_dim / float(max(ch, cw))
+            crop = cv2.resize(crop, (int(round(cw * s)), int(round(ch * s))), interpolation=cv2.INTER_AREA)
+
+        _, buffer = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 88])
+        return Response(buffer.tobytes(), mimetype="image/jpeg")
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+@app.route("/api/tree-sample", methods=["GET"])
+def get_tree_sample():
+    """
+    Returns a 100% native full-resolution crop centered at (x, y) for the live 1-tree loupe.
+    """
+    if not get_or_load_image():
+        return "Image not loaded", 500
+
+    try:
+        # Check if coordinates are given in overview or full scale
+        scale = CACHE["scale_factor"]
+        is_overview = request.args.get("coord_scale", "overview") == "overview"
+        
+        raw_x = float(request.args.get("x", CACHE["full_width"] // 2))
+        raw_y = float(request.args.get("y", CACHE["full_height"] // 2))
+
+        fx = int(round(raw_x * scale)) if is_overview else int(round(raw_x))
+        fy = int(round(raw_y * scale)) if is_overview else int(round(raw_y))
+
+        # Size of the sample box in native pixels (e.g. 260x260 px)
+        box_size = int(request.args.get("size", 260))
+        half = box_size // 2
+
+        x1 = max(0, fx - half)
+        y1 = max(0, fy - half)
+        x2 = min(CACHE["full_width"], fx + half)
+        y2 = min(CACHE["full_height"], fy + half)
+
+        patch = CACHE["full_image"][y1:y2, x1:x2]
+        
+        # Ensure square shape with black border if near boundary
+        if patch.shape[0] != box_size or patch.shape[1] != box_size:
+            square = np.zeros((box_size, box_size, 3), dtype=np.uint8)
+            ph, pw = patch.shape[:2]
+            square[:ph, :pw] = patch
+            patch = square
+
+        _, buffer = cv2.imencode(".jpg", patch, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        return Response(buffer.tobytes(), mimetype="image/jpeg")
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+@app.route("/api/auto-calibrate", methods=["POST"])
+def auto_calibrate():
+    """
+    1-Click Visual Auto-Calibration:
+    Analyzes the user-selected palm tree crown, computes the radial profile,
+    and returns recommended Crown Radius, Spacing, and Vegetation Threshold!
+    """
+    if not get_or_load_image():
+        return jsonify({"success": False, "error": "Image not loaded"}), 500
+
+    data = request.json or {}
+    scale = CACHE["scale_factor"]
+    is_overview = data.get("coord_scale", "overview") == "overview"
+
+    raw_x = float(data.get("x", 0))
+    raw_y = float(data.get("y", 0))
+
+    fx = int(round(raw_x * scale)) if is_overview else int(round(raw_x))
+    fy = int(round(raw_y * scale)) if is_overview else int(round(raw_y))
+
+    # Crop 320x320 patch around clicked palm
+    half = 160
+    x1 = max(0, fx - half)
+    y1 = max(0, fy - half)
+    x2 = min(CACHE["full_width"], fx + half)
+    y2 = min(CACHE["full_height"], fy + half)
+
+    patch = CACHE["full_image"][y1:y2, x1:x2]
+    if patch.shape[0] < 50 or patch.shape[1] < 50:
+        return jsonify({"success": False, "error": "Point too close to image edge."}), 400
+
+    # Compute ExG vegetation map
+    b, g, r = cv2.split(patch.astype(np.float32))
+    exg = 2 * g - r - b
+    exg_norm = cv2.normalize(exg, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+    # Find peak near center
+    cy, cx = fy - y1, fx - x1
+    local_window = exg_norm[max(0, cy-30):min(patch.shape[0], cy+30), max(0, cx-30):min(patch.shape[1], cx+30)]
+    
+    # Measure radial gradient falloff from center to find crown boundary
+    smooth = cv2.GaussianBlur(exg_norm, (21, 21), 0)
+    center_val = float(smooth[cy, cx])
+    background_val = float(np.percentile(smooth, 25))
+
+    # Find radius where intensity drops by 45% towards background
+    threshold_falloff = background_val + (center_val - background_val) * 0.55
+    
+    # Sample concentric circles from r=15 to r=90
+    detected_r = 30
+    for r_test in range(15, 90, 2):
+        mask_ring = np.zeros(smooth.shape, dtype=np.uint8)
+        cv2.circle(mask_ring, (cx, cy), r_test, 255, 2)
+        vals = smooth[mask_ring > 0]
+        if len(vals) > 0 and np.mean(vals) < threshold_falloff:
+            detected_r = r_test
+            break
+
+    # Convert detected radius to parameters
+    detected_r = max(18, min(65, detected_r))
+    
+    # Recommended settings
+    rec_blur = int(round(detected_r * 0.9))
+    if rec_blur % 2 == 0:
+        rec_blur += 1
+    rec_spacing = int(round(detected_r * 2.1))
+    rec_thresh = int(np.clip(background_val + 5, 60, 95))
+
+    # Tree category
+    if detected_r < 25:
+        category = "Young Palm (TBM / Tanaman Belum Menghasilkan)"
+        palm_type = "young"
+    elif detected_r < 40:
+        category = "Semi-Mature Palm (TM Muda)"
+        palm_type = "semi_mature"
+    else:
+        category = "Fully Mature Palm (TM Dewasa / Interlocking Canopies)"
+        palm_type = "mature"
+
+    return jsonify({
+        "success": True,
+        "calibrated_tree": {
+            "full_x": fx,
+            "full_y": fy,
+            "overview_x": round(fx / scale, 2),
+            "overview_y": round(fy / scale, 2),
+            "crown_radius_px": detected_r,
+            "category": category,
+            "palm_type": palm_type
+        },
+        "recommended_parameters": {
+            "blur_ksize": rec_blur,
+            "min_distance_px": rec_spacing,
+            "vegetation_threshold": rec_thresh,
+            "crown_radius_px": detected_r
+        }
+    })
+
+@app.route("/api/detect-gaps", methods=["POST"])
+def detect_planting_gaps():
+    """
+    Identifies vacant planting holes / missing trees (Titik Sisipan / Pokok Mati)
+    by analyzing missing regular grid intersections inside the active polygon.
+    """
+    data = request.json or {}
+    palms = data.get("palms", [])
+    raw_polygon = data.get("polygon", [])
+    expected_spacing = float(data.get("expected_spacing", 70.0))
+
+    if len(palms) < 10 or len(raw_polygon) < 3:
+        return jsonify({"success": True, "gaps": [], "total_gaps": 0, "mortality_percent": 0.0})
+
+    # Find missing spots where a tree should exist according to neighbor distances
+    coords = np.array([[p["x"], p["y"]] for p in palms], dtype=np.float32)
+    poly_arr = np.array(raw_polygon, dtype=np.float32)
+
+    gaps = []
+    min_gap_dist = expected_spacing * 0.8
+    max_gap_dist = expected_spacing * 1.5
+
+    # Check inter-palm midpoints and empty grid spaces
+    for i in range(min(len(coords), 300)):
+        pt1 = coords[i]
+        dists = np.hypot(coords[:, 0] - pt1[0], coords[:, 1] - pt1[1])
+        neighbors = np.where((dists > min_gap_dist) & (dists < max_gap_dist))[0]
+
+        for n_idx in neighbors:
+            mid = (pt1 + coords[n_idx]) * 0.5
+            # Check if inside polygon
+            if cv2.pointPolygonTest(poly_arr, (float(mid[0]), float(mid[1])), False) >= 0:
+                # Check if there is already a palm near midpoint
+                dist_to_any = np.min(np.hypot(coords[:, 0] - mid[0], coords[:, 1] - mid[1]))
+                if dist_to_any > expected_spacing * 0.65:
+                    if not any(np.hypot(g["x"] - mid[0], g["y"] - mid[1]) < min_gap_dist * 0.5 for g in gaps):
+                        gaps.append({
+                            "id": len(gaps) + 1,
+                            "x": round(float(mid[0]), 2),
+                            "y": round(float(mid[1]), 2),
+                            "status": "Titik Sisipan (Missing Palm)"
+                        })
+
+    mortality = round((len(gaps) / max(1, len(palms) + len(gaps))) * 100, 1)
+
+    return jsonify({
+        "success": True,
+        "gaps": gaps[:100],  # cap at 100 for display
+        "total_gaps": len(gaps),
+        "mortality_percent": mortality
+    })
 
 if __name__ == "__main__":
     get_or_load_image()

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PalmSensus AI — Drone Oil Palm Sensus & Analytics</title>
+    <title>PalmSentinel AI — Enterprise Drone Oil Palm Sensus & Analytics</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/static/style.css">
@@ -18,27 +18,29 @@
             </div>
             <div>
                 <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
-                    PalmSensus AI <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Enterprise v2.0</span>
+                    PalmSentinel AI <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Pro v2.5</span>
                 </h1>
-                <p class="text-xs text-slate-400">High-Precision Drone Orthophoto Tree Counter & Plantation Sensus</p>
+                <p class="text-xs text-slate-400">Enterprise Drone Orthophoto Tree Counter & Plantation Sensus (F: Drive)</p>
             </div>
         </div>
 
-        <!-- Image Stats Badge -->
-        <div id="image-badge" class="hidden md:flex items-center space-x-4 text-xs bg-slate-950/80 px-3.5 py-1.5 rounded-lg border border-slate-800">
-            <span class="text-slate-400">Orthophoto: <strong id="lbl-filename" class="text-emerald-400 font-mono">Loading...</strong></span>
-            <span class="text-slate-600">|</span>
-            <span class="text-slate-400">Resolution: <strong id="lbl-resolution" class="text-white font-mono">14980 × 9217 px</strong></span>
-            <span class="text-slate-600">|</span>
-            <span class="text-slate-400">Engine: <strong class="text-emerald-400">ExG Peak Dilation + NMS</strong></span>
+        <!-- Mode Switcher Tabs in Top Bar -->
+        <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+            <button id="tab-simple" class="tab-btn active px-3.5 py-1.5 rounded-md font-semibold flex items-center gap-1.5 transition">
+                <span>🌿 Simple Mode</span>
+                <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded">Recommended</span>
+            </button>
+            <button id="tab-advanced" class="tab-btn px-3.5 py-1.5 rounded-md font-semibold flex items-center gap-1.5 text-slate-400 hover:text-white transition">
+                <span>⚙️ Advanced Mode</span>
+            </button>
         </div>
 
         <div class="flex items-center space-x-2">
-            <button id="btn-fit-screen" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 transition">
+            <button id="btn-fit-screen" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 transition" title="Fit Entire Orthophoto">
                 🔍 Fit View
             </button>
-            <button id="btn-reset-view" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 transition">
-                100% Zoom
+            <button id="btn-native-res" class="px-3 py-1.5 text-xs bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 rounded border border-emerald-700/50 transition font-semibold" title="Load Razor-Sharp 100% Native Resolution">
+                ⚡ 100% Sharp Pixels
             </button>
         </div>
     </header>
@@ -50,9 +52,40 @@
         <aside class="w-80 md:w-96 bg-slate-900 border-r border-slate-800 flex flex-col justify-between z-10 overflow-y-auto custom-scrollbar">
             <div class="p-4 space-y-4">
 
-                <!-- Interaction Tool Mode -->
+                <!-- 1. LIVE 1-TREE INSPECTION LOUPE CARD (Both Modes) -->
+                <div class="bg-slate-950 p-3 rounded-xl border border-emerald-500/30 shadow-lg space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                            <span>🔍 1-Tree Live Loupe</span>
+                            <span class="text-[9px] bg-emerald-500/10 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/20">100% Native Zoom</span>
+                        </span>
+                        <span id="loupe-status" class="text-[10px] text-slate-400 font-mono">Sampled</span>
+                    </div>
+
+                    <!-- Loupe Circular / Square Preview Container -->
+                    <div class="relative w-full h-44 bg-black rounded-lg overflow-hidden border border-slate-800 flex items-center justify-center">
+                        <img id="loupe-img" src="" alt="Tree Preview" class="w-full h-full object-cover">
+                        <!-- Dynamic Sizing Overlay Circle -->
+                        <div id="loupe-circle" class="absolute pointer-events-none rounded-full border-2 border-emerald-400 shadow-sm flex items-center justify-center">
+                            <div class="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                        </div>
+                        <div class="absolute bottom-1.5 left-2 bg-slate-950/80 backdrop-blur px-2 py-0.5 rounded text-[10px] text-slate-300 font-mono">
+                            Apex: <span id="loupe-coords" class="text-emerald-400">Centered</span>
+                        </div>
+                    </div>
+
+                    <!-- Auto Calibrate Button -->
+                    <button id="btn-sample-tree" class="w-full py-2 px-3 bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/60 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                        <span>🎯 Click on Map to Sample a Tree</span>
+                    </button>
+                    <p class="text-[11px] text-slate-400 italic text-center">
+                        The green circle above shows exactly how 1 palm tree will be detected.
+                    </p>
+                </div>
+
+                <!-- 2. AREA SELECTION TOOL -->
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">1. Area Selection Tool</label>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Area Selection Tool</label>
                     <div class="grid grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-lg border border-slate-800 text-xs">
                         <button id="tool-poly" class="tool-btn active flex flex-col items-center py-2 px-1 rounded transition text-center" title="Click points around field boundary">
                             <span class="text-base">⬡</span>
@@ -72,59 +105,88 @@
                     </p>
                 </div>
 
-                <!-- Block Information -->
+                <!-- 3. SIMPLE MODE CONTROLS -->
+                <div id="section-simple" class="space-y-3">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Palm Size & Sensitivity</label>
+                    
+                    <!-- Intuitive Palm Size Slider -->
+                    <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-300 font-medium">Palm Crown Size:</span>
+                            <strong id="val-simple-size" class="text-emerald-400 font-mono">Mature (TM)</strong>
+                        </div>
+                        <input id="slider-simple-size" type="range" min="18" max="55" step="1" value="32" class="w-full accent-emerald-500">
+                        <div class="flex justify-between text-[10px] text-slate-500">
+                            <span>🌱 Young (TBM)</span>
+                            <span>🌴 Semi-Mature</span>
+                            <span>🌲 Large Mature</span>
+                        </div>
+                    </div>
+
+                    <!-- Strictness Slider -->
+                    <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800 space-y-2">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-300 font-medium">Counting Strictness:</span>
+                            <strong id="val-simple-strict" class="text-emerald-400 font-mono">Balanced</strong>
+                        </div>
+                        <input id="slider-simple-strict" type="range" min="1" max="5" step="1" value="3" class="w-full accent-emerald-500">
+                        <div class="flex justify-between text-[10px] text-slate-500">
+                            <span>Catch All Crowns</span>
+                            <span>Balanced</span>
+                            <span>Strict Canopy Only</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. ADVANCED MODE CONTROLS (Hidden by default) -->
+                <div id="section-advanced" class="hidden space-y-3">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                        <span>⚙️ Technical Calibration Sliders</span>
+                    </label>
+
+                    <div class="space-y-3 bg-slate-950/80 p-3 rounded-lg border border-amber-500/30">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-300">Crown Blur Radius ($K_{size}$):</span>
+                                <span id="val-blur" class="font-mono text-amber-400">31 px</span>
+                            </div>
+                            <input id="slider-blur" type="range" min="9" max="51" step="2" value="31" class="w-full accent-amber-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-300">Min Tree Spacing ($D_{min}$):</span>
+                                <span id="val-spacing" class="font-mono text-amber-400">68 px</span>
+                            </div>
+                            <input id="slider-spacing" type="range" min="30" max="120" step="2" value="68" class="w-full accent-amber-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-300">Vegetation Sensitivity (ExG):</span>
+                                <span id="val-thresh" class="font-mono text-amber-400">75</span>
+                            </div>
+                            <input id="slider-thresh" type="range" min="40" max="120" step="1" value="75" class="w-full accent-amber-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-300">Drone GSD (Scale cm/px):</span>
+                                <span id="val-gsd" class="font-mono text-amber-400">4.0 cm/px</span>
+                            </div>
+                            <input id="slider-gsd" type="range" min="1.0" max="15.0" step="0.5" value="4.0" class="w-full accent-amber-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. BLOCK NAME & EXECUTION -->
                 <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">2. Plantation Block</label>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Plantation Block Name</label>
                     <div class="flex items-center space-x-2">
                         <input id="input-block-name" type="text" value="Blok 1 - TM Utara" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500" placeholder="Block name...">
                         <button id="btn-clear-roi" class="px-2.5 py-1.5 text-xs bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 rounded transition" title="Clear selection">
                             Clear
                         </button>
-                    </div>
-                </div>
-
-                <!-- Detection Presets -->
-                <div class="space-y-2">
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">3. Detection Preset</label>
-                    <select id="select-preset" class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
-                        <option value="mature" selected>🌴 Mature Palm (TM - Tanaman Menghasilkan)</option>
-                        <option value="young">🌱 Young Palm (TBM - Tanaman Belum Menghasilkan)</option>
-                        <option value="custom">⚙️ Custom Parameters</option>
-                    </select>
-                </div>
-
-                <!-- Parameter Tuning Sliders -->
-                <div class="space-y-3 bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-slate-300">Crown Blur Radius:</span>
-                            <span id="val-blur" class="font-mono text-emerald-400">31 px</span>
-                        </div>
-                        <input id="slider-blur" type="range" min="9" max="51" step="2" value="31" class="w-full accent-emerald-500">
-                    </div>
-
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-slate-300">Min Tree Spacing:</span>
-                            <span id="val-spacing" class="font-mono text-emerald-400">68 px</span>
-                        </div>
-                        <input id="slider-spacing" type="range" min="30" max="110" step="2" value="68" class="w-full accent-emerald-500">
-                    </div>
-
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-slate-300">Vegetation Sensitivity (ExG):</span>
-                            <span id="val-thresh" class="font-mono text-emerald-400">75</span>
-                        </div>
-                        <input id="slider-thresh" type="range" min="40" max="120" step="1" value="75" class="w-full accent-emerald-500">
-                    </div>
-
-                    <div>
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-slate-300">Drone GSD (Scale):</span>
-                            <span id="val-gsd" class="font-mono text-emerald-400">4.0 cm/px</span>
-                        </div>
-                        <input id="slider-gsd" type="range" min="1.0" max="10.0" step="0.2" value="4.0" class="w-full accent-emerald-500">
                     </div>
                 </div>
 
@@ -136,9 +198,24 @@
                     </button>
                 </div>
 
-                <!-- Export Options -->
+                <!-- 6. ADVANCED AGRO-ANALYTICS TOGGLES -->
+                <div class="bg-slate-950/40 p-3 rounded-lg border border-slate-800/80 space-y-2 text-xs">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Agro-Analytics Overlays</label>
+                    <div class="space-y-1.5">
+                        <label class="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
+                            <input id="chk-missing-palms" type="checkbox" class="accent-amber-500 rounded">
+                            <span>⚠️ Highlight Missing Palms (Titik Sisipan)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
+                            <input id="chk-density-heatmap" type="checkbox" class="accent-emerald-500 rounded">
+                            <span>🔥 Canopy Density Heatmap</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 7. EXPORT OPTIONS -->
                 <div class="pt-2 border-t border-slate-800 space-y-2">
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">4. Export Results</label>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Export Results</label>
                     <div class="grid grid-cols-3 gap-1.5">
                         <button id="btn-export-csv" class="export-btn px-2 py-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-center transition">
                             📊 CSV Table
@@ -171,9 +248,11 @@
                 <button id="btn-zoom-out" class="w-7 h-7 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-white font-bold transition">-</button>
             </div>
 
-            <!-- Coordinate Indicator -->
-            <div class="absolute bottom-5 left-5 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg px-3 py-1.5 shadow-xl text-[11px] text-slate-400 font-mono z-10">
-                X: <span id="pos-x" class="text-white">0</span>, Y: <span id="pos-y" class="text-white">0</span>
+            <!-- Coordinate & Resolution Indicator -->
+            <div class="absolute bottom-5 left-5 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg px-3 py-1.5 shadow-xl text-[11px] text-slate-400 font-mono z-10 flex items-center space-x-3">
+                <span>X: <strong id="pos-x" class="text-white">0</strong>, Y: <strong id="pos-y" class="text-white">0</strong></span>
+                <span class="text-slate-600">|</span>
+                <span id="lbl-patch-status" class="text-emerald-400">Native Dynamic View</span>
             </div>
         </main>
 
@@ -205,6 +284,18 @@
                 <p id="stat-status" class="text-[11px] text-slate-400 leading-tight">
                     Draw an area and click "Run Palm Sensus Count" to evaluate.
                 </p>
+            </div>
+
+            <!-- Gaps & Mortality Stats (Appears after count) -->
+            <div id="stat-gaps-card" class="hidden bg-amber-950/30 p-2.5 rounded-lg border border-amber-800/50 space-y-1">
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-amber-300">Titik Sisipan / Gaps:</span>
+                    <strong id="stat-gaps" class="font-mono text-amber-400 text-sm">0</strong>
+                </div>
+                <div class="flex justify-between text-[11px] text-slate-400">
+                    <span>Mortality / Vacancy:</span>
+                    <span id="stat-mortality" class="font-mono text-amber-300">0.0%</span>
+                </div>
             </div>
 
             <div class="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800 text-slate-400">
