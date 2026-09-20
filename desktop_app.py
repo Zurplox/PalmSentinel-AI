@@ -10,6 +10,23 @@ if sys.platform == "win32":
 import webview
 from app import app, get_or_load_image
 
+# Configure Edge WebView2 to strictly disable browser-level UI zoom
+try:
+    import webview.platforms.edgechromium as ec
+    _orig_ready = ec.EdgeChrome.on_webview_ready
+    def _patched_ready(self, sender, args):
+        _orig_ready(self, sender, args)
+        if args.IsSuccess and sender.CoreWebView2:
+            try:
+                settings = sender.CoreWebView2.Settings
+                settings.IsZoomControlEnabled = False
+                settings.AreBrowserAcceleratorKeysEnabled = False
+            except Exception as e:
+                pass
+    ec.EdgeChrome.on_webview_ready = _patched_ready
+except Exception:
+    pass
+
 def main():
     print("[PalmSentinel] Initializing native desktop window...")
     get_or_load_image()
@@ -22,7 +39,7 @@ def main():
         height=900,
         min_size=(1000, 650),
         text_select=True,
-        zoomable=True,
+        zoomable=False,
         confirm_close=False
     )
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PalmSentinel AI — Enterprise Drone Oil Palm Sensus & Analytics</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -123,8 +123,12 @@
 
                 <!-- 2. AREA SELECTION TOOL -->
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Area Selection Tool</label>
-                    <div class="grid grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-lg border border-slate-800 text-xs">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Navigation & ROI Tool</label>
+                    <div class="grid grid-cols-4 gap-1 bg-slate-950 p-1.5 rounded-lg border border-slate-800 text-xs">
+                        <button id="tool-pan" class="tool-btn flex flex-col items-center py-2 px-1 rounded transition text-center" title="Click and drag to pan across the plantation">
+                            <span class="text-base">✋</span>
+                            <span class="mt-0.5">Pan</span>
+                        </button>
                         <button id="tool-poly" class="tool-btn active flex flex-col items-center py-2 px-1 rounded transition text-center" title="Click points around field boundary">
                             <span class="text-base">⬡</span>
                             <span class="mt-0.5">Polygon</span>
@@ -135,7 +139,7 @@
                         </button>
                         <button id="tool-edit" class="tool-btn flex flex-col items-center py-2 px-1 rounded transition text-center" title="Click to add/delete individual tree markers">
                             <span class="text-base">👆</span>
-                            <span class="mt-0.5">Edit Markers</span>
+                            <span class="mt-0.5">Edit</span>
                         </button>
                     </div>
                     <p id="tool-instruction" class="text-[11px] text-emerald-400 mt-1.5 px-1 italic">

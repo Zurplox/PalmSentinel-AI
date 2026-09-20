@@ -64,3 +64,24 @@ input[type="range"] {
     transition: width 0.1s ease, height 0.1s ease;
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
 }
+
+/* Prevent native browser UI zooming and accidental gesture scrolling */
+html, body {
+    touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+}
+
+#canvas-container {
+    touch-action: none !important;
+    overscroll-behavior: none !important;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#main-canvas {
+    touch-action: none !important;
+    user-select: none;
+    -webkit-user-select: none;
+    display: block;
+}

@@ -102,6 +102,7 @@ const chkShowCircles = document.getElementById('chk-show-circles');
 const btnNativeRes = document.getElementById('btn-native-res');
 
 // Tool Buttons
+const toolPanBtn = document.getElementById('tool-pan');
 const toolPolyBtn = document.getElementById('tool-poly');
 const toolBoxBtn = document.getElementById('tool-box');
 const toolEditBtn = document.getElementById('tool-edit');
@@ -695,6 +696,7 @@ function setupEventListeners() {
     });
 
     // Tool Switchers
+    if (toolPanBtn) toolPanBtn.addEventListener('click', () => setTool('pan'));
     toolPolyBtn.addEventListener('click', () => setTool('poly'));
     toolBoxBtn.addEventListener('click', () => setTool('box'));
     toolEditBtn.addEventListener('click', () => setTool('edit'));
@@ -744,12 +746,108 @@ function setupEventListeners() {
     document.getElementById('btn-export-geojson').addEventListener('click', exportGeojson);
     document.getElementById('btn-export-img').addEventListener('click', exportAnnotatedImage);
 
+    // Prevent default context menu on canvas & container so right-click pan works cleanly
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    container.addEventListener('contextmenu', (e) => e.preventDefault());
+
     // Mouse Interactions
     canvas.addEventListener('mousedown', handleMouseDown);
+    container.addEventListener('mousedown', (e) => {
+        if (e.target === container) handleMouseDown(e);
+    });
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+
+    // Canvas & Container Wheel (Intercepts both mouse wheel and touchpad pinches)
     canvas.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('wheel', handleWheel, { passive: false });
     canvas.addEventListener('dblclick', handleDoubleClick);
+
+    // Strict Window-Level UI Zoom Blocker (Never zoom HTML UI)
+    window.addEventListener('wheel', (e) => {
+        if (e.ctrlKey) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    // Keyboard Shortcuts (Ctrl + '+' / '-' / '0' zooms image, not UI)
+    window.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd' || e.key === 'Add') {
+                e.preventDefault();
+                zoomBy(1.25);
+            } else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.key === 'Subtract') {
+                e.preventDefault();
+                zoomBy(0.8);
+            } else if (e.key === '0' || e.code === 'Numpad0') {
+                e.preventDefault();
+                fitToScreen();
+            }
+        }
+    });
+
+    // Touch gesture scaling block (Safari / Edge)
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('gesturechange', (e) => e.preventDefault());
+    document.addEventListener('gestureend', (e) => e.preventDefault());
+
+    // Touchscreen Multi-Touch Pinch Zoom Support
+    setupTouchPinchZoom();
+}
+
+function setupTouchPinchZoom() {
+    const activePointers = new Map();
+    let initialDist = null;
+    let initialZoom = null;
+    let initialCenter = null;
+
+    canvas.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch') {
+            activePointers.set(e.pointerId, e);
+            if (activePointers.size === 2) {
+                const pts = Array.from(activePointers.values());
+                initialDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+                initialZoom = state.zoom;
+                const rect = canvas.getBoundingClientRect();
+                initialCenter = {
+                    x: ((pts[0].clientX + pts[1].clientX) / 2) - rect.left,
+                    y: ((pts[0].clientY + pts[1].clientY) / 2) - rect.top
+                };
+            }
+        }
+    });
+
+    window.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'touch' && activePointers.has(e.pointerId)) {
+            activePointers.set(e.pointerId, e);
+            if (activePointers.size === 2 && initialDist && initialCenter) {
+                const pts = Array.from(activePointers.values());
+                const curDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+                const scale = curDist / initialDist;
+                const newZoom = Math.max(0.04, Math.min(25.0, initialZoom * scale));
+                const pt = screenToImage(initialCenter.x, initialCenter.y);
+                state.zoom = newZoom;
+                state.panX = initialCenter.x - pt.x * state.zoom;
+                state.panY = initialCenter.y - pt.y * state.zoom;
+                updateZoomLabel();
+                scheduleViewportPatch();
+                render();
+            }
+        }
+    });
+
+    function removePointer(e) {
+        if (activePointers.has(e.pointerId)) {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size < 2) {
+                initialDist = null;
+                initialZoom = null;
+                initialCenter = null;
+            }
+        }
+    }
+    window.addEventListener('pointerup', removePointer);
+    window.addEventListener('pointercancel', removePointer);
 }
 
 function switchTab(tab) {
@@ -772,19 +870,27 @@ function setTool(tool) {
     btnSampleTree.classList.remove("bg-emerald-600", "text-white");
     btnSampleTree.textContent = "🎯 Click on Map to Sample a Tree";
 
+    if (toolPanBtn) toolPanBtn.classList.toggle('active', tool === 'pan');
     toolPolyBtn.classList.toggle('active', tool === 'poly');
     toolBoxBtn.classList.toggle('active', tool === 'box');
     toolEditBtn.classList.toggle('active', tool === 'edit');
 
-    if (tool === 'poly') {
+    if (tool === 'pan') {
+        toolInstruction.textContent = "Click & drag anywhere to pan the map. Use mouse wheel or pinch to zoom.";
+        canvas.style.cursor = "grab";
+        container.style.cursor = "grab";
+    } else if (tool === 'poly') {
         toolInstruction.textContent = "Click on the image to place polygon vertices. Double-click or click start point to close.";
         canvas.style.cursor = "crosshair";
+        container.style.cursor = "crosshair";
     } else if (tool === 'box') {
         toolInstruction.textContent = "Click and drag to select a rectangular block area.";
         canvas.style.cursor = "crosshair";
+        container.style.cursor = "crosshair";
     } else if (tool === 'edit') {
         toolInstruction.textContent = "Left-click empty space to ADD a palm. Click existing marker to DELETE it.";
         canvas.style.cursor = "pointer";
+        container.style.cursor = "default";
     }
 }
 
@@ -794,7 +900,7 @@ function zoomBy(factor) {
     const pt = screenToImage(cx, cy);
 
     state.zoom *= factor;
-    state.zoom = Math.max(0.05, Math.min(20.0, state.zoom));
+    state.zoom = Math.max(0.04, Math.min(25.0, state.zoom));
 
     state.panX = cx - pt.x * state.zoom;
     state.panY = cy - pt.y * state.zoom;
@@ -805,17 +911,37 @@ function zoomBy(factor) {
 
 function handleWheel(e) {
     e.preventDefault();
+    e.stopPropagation();
+
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    let mouseX = e.clientX - rect.left;
+    let mouseY = e.clientY - rect.top;
+
+    // Anchor focal point within canvas bounds
+    if (mouseX < 0 || mouseX > canvas.width || mouseY < 0 || mouseY > canvas.height) {
+        mouseX = Math.max(0, Math.min(canvas.width, mouseX));
+        mouseY = Math.max(0, Math.min(canvas.height, mouseY));
+    }
+
     const ptBefore = screenToImage(mouseX, mouseY);
 
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    state.zoom *= zoomFactor;
-    state.zoom = Math.max(0.05, Math.min(20.0, state.zoom));
+    // Differentiate between trackpad pinch gesture (e.ctrlKey) vs standard mouse wheel
+    let zoomFactor;
+    if (e.ctrlKey) {
+        // Trackpad pinch-to-zoom: deltaY gives fine fractional velocity
+        zoomFactor = Math.exp(-e.deltaY * 0.01);
+    } else {
+        // Standard mouse wheel step
+        zoomFactor = e.deltaY < 0 ? 1.18 : 0.85;
+    }
 
+    const newZoom = Math.max(0.04, Math.min(25.0, state.zoom * zoomFactor));
+    if (Math.abs(newZoom - state.zoom) < 0.0001) return;
+
+    state.zoom = newZoom;
     state.panX = mouseX - ptBefore.x * state.zoom;
     state.panY = mouseY - ptBefore.y * state.zoom;
+
     updateZoomLabel();
     scheduleViewportPatch();
     render();
@@ -833,12 +959,13 @@ function handleMouseDown(e) {
         return;
     }
 
-    // Pan with Middle Mouse Button, Spacebar, or Right Button
-    if (e.button === 1 || e.button === 2 || e.shiftKey) {
+    // Pan with Pan Tool (left button), Middle Mouse Button, Right Button, or Shift + Left Button
+    if (state.currentTool === 'pan' || e.button === 1 || e.button === 2 || e.shiftKey) {
         state.isPanning = true;
         state.startPanX = mx - state.panX;
         state.startPanY = my - state.panY;
         canvas.style.cursor = "grabbing";
+        container.style.cursor = "grabbing";
         e.preventDefault();
         return;
     }
@@ -901,7 +1028,9 @@ function handleMouseMove(e) {
 function handleMouseUp(e) {
     if (state.isPanning) {
         state.isPanning = false;
-        canvas.style.cursor = state.isSamplingMode ? "crosshair" : (state.currentTool === 'edit' ? "pointer" : "crosshair");
+        const cur = state.isSamplingMode ? "crosshair" : (state.currentTool === 'pan' ? "grab" : (state.currentTool === 'edit' ? "pointer" : "crosshair"));
+        canvas.style.cursor = cur;
+        container.style.cursor = cur;
         scheduleViewportPatch();
     }
 
