@@ -99,6 +99,7 @@ const chkMissingPalms = document.getElementById('chk-missing-palms');
 const chkDensityHeatmap = document.getElementById('chk-density-heatmap');
 const chkShowNumbers = document.getElementById('chk-show-numbers');
 const chkShowCircles = document.getElementById('chk-show-circles');
+const btnFitScreen = document.getElementById('btn-fit-screen');
 const btnNativeRes = document.getElementById('btn-native-res');
 
 // Tool Buttons
@@ -254,16 +255,22 @@ async function switchOrUploadPhoto(formDataOrJson) {
 }
 
 function resizeCanvas() {
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
+    if (!container) return;
+    const w = container.clientWidth || (window.innerWidth - 384);
+    const h = container.clientHeight || (window.innerHeight - 50);
+    if (w > 50 && h > 50) {
+        canvas.width = w;
+        canvas.height = h;
+    }
     render();
 }
 
 function fitToScreen() {
-    if (!state.imageLoaded) return;
-    const margin = 40;
-    const availW = canvas.width - margin * 2;
-    const availH = canvas.height - margin * 2;
+    if (!state.imageLoaded || !state.image.width) return;
+    resizeCanvas();
+    const margin = 24;
+    const availW = Math.max(50, canvas.width - margin * 2);
+    const availH = Math.max(50, canvas.height - margin * 2);
     const scaleX = availW / state.image.width;
     const scaleY = availH / state.image.height;
     state.zoom = Math.min(scaleX, scaleY);
@@ -730,21 +737,31 @@ function setupEventListeners() {
         render();
     });
 
-    btnFitScreen.addEventListener('click', fitToScreen);
-    btnNativeRes.addEventListener('click', () => {
-        state.zoom = 1.0;
-        updateZoomLabel();
-        scheduleViewportPatch();
-        render();
-    });
+    if (btnFitScreen) btnFitScreen.addEventListener('click', fitToScreen);
+    if (btnNativeRes) {
+        btnNativeRes.addEventListener('click', () => {
+            state.zoom = 1.0;
+            state.panX = (canvas.width - state.image.width) / 2;
+            state.panY = (canvas.height - state.image.height) / 2;
+            updateZoomLabel();
+            scheduleViewportPatch();
+            render();
+        });
+    }
 
-    document.getElementById('btn-zoom-in').addEventListener('click', () => zoomBy(1.25));
-    document.getElementById('btn-zoom-out').addEventListener('click', () => zoomBy(0.8));
+    const btnZoomIn = document.getElementById('btn-zoom-in');
+    if (btnZoomIn) btnZoomIn.addEventListener('click', () => zoomBy(1.3));
+
+    const btnZoomOut = document.getElementById('btn-zoom-out');
+    if (btnZoomOut) btnZoomOut.addEventListener('click', () => zoomBy(0.77));
 
     // Exports
-    document.getElementById('btn-export-csv').addEventListener('click', exportCsv);
-    document.getElementById('btn-export-geojson').addEventListener('click', exportGeojson);
-    document.getElementById('btn-export-img').addEventListener('click', exportAnnotatedImage);
+    const btnCsv = document.getElementById('btn-export-csv');
+    if (btnCsv) btnCsv.addEventListener('click', exportCsv);
+    const btnGeo = document.getElementById('btn-export-geojson');
+    if (btnGeo) btnGeo.addEventListener('click', exportGeojson);
+    const btnImg = document.getElementById('btn-export-img');
+    if (btnImg) btnImg.addEventListener('click', exportAnnotatedImage);
 
     // Prevent default context menu on canvas & container so right-click pan works cleanly
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -900,7 +917,7 @@ function zoomBy(factor) {
     const pt = screenToImage(cx, cy);
 
     state.zoom *= factor;
-    state.zoom = Math.max(0.04, Math.min(25.0, state.zoom));
+    state.zoom = Math.max(0.04, Math.min(35.0, state.zoom));
 
     state.panX = cx - pt.x * state.zoom;
     state.panY = cy - pt.y * state.zoom;
@@ -931,11 +948,11 @@ function handleWheel(e) {
         // Trackpad pinch-to-zoom: deltaY gives fine fractional velocity
         zoomFactor = Math.exp(-e.deltaY * 0.01);
     } else {
-        // Standard mouse wheel step
-        zoomFactor = e.deltaY < 0 ? 1.18 : 0.85;
+        // Standard mouse wheel notch: snappy, responsive zoom
+        zoomFactor = e.deltaY < 0 ? 1.25 : 0.8;
     }
 
-    const newZoom = Math.max(0.04, Math.min(25.0, state.zoom * zoomFactor));
+    const newZoom = Math.max(0.04, Math.min(35.0, state.zoom * zoomFactor));
     if (Math.abs(newZoom - state.zoom) < 0.0001) return;
 
     state.zoom = newZoom;
@@ -1060,7 +1077,19 @@ function handleDoubleClick(e) {
         state.isDrawingPoly = false;
         state.hoverPoint = null;
         render();
+        return;
     }
+    // Double click on map zooms straight into that point
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const pt = screenToImage(mx, my);
+    state.zoom = Math.min(35.0, state.zoom * 1.6);
+    state.panX = mx - pt.x * state.zoom;
+    state.panY = my - pt.y * state.zoom;
+    updateZoomLabel();
+    scheduleViewportPatch();
+    render();
 }
 
 // Manual marker edit
