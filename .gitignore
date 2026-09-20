@@ -28,3 +28,8 @@ output/
 .idea/
 *.swp
 .DS_Store
+
+# PyInstaller Build Artifacts
+build/
+dist/
+*.spec
