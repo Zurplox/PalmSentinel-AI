@@ -18,8 +18,12 @@ from engine.detector import PalmDetector
 from engine.tiler import TiledProcessor
 from engine.roi_utils import calculate_polygon_area, calculate_sph
 
-IMAGE_PATH = r"D:\Downloads\Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg"
-OUTPUT_DIR = r"C:\Users\siapu\.gemini\antigravity\scratch\palm-sensus-ai\output"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_DATA_IMG = os.path.join(BASE_DIR, "data", "Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg")
+FALLBACK_IMG = r"D:\Downloads\Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg"
+IMAGE_PATH = LOCAL_DATA_IMG if os.path.exists(LOCAL_DATA_IMG) else FALLBACK_IMG
+
+OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Define real plantation block boundaries from the orthophoto

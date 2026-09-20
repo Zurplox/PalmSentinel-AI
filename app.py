@@ -25,8 +25,11 @@ from engine.tiler import TiledProcessor
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# Default image path provided by user
-DEFAULT_IMAGE_PATH = r"D:\Downloads\Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg"
+# Default image path (checks local data folder first, falls back to original download)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_DATA_IMG = os.path.join(BASE_DIR, "data", "Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg")
+FALLBACK_IMG = r"D:\Downloads\Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg"
+DEFAULT_IMAGE_PATH = LOCAL_DATA_IMG if os.path.exists(LOCAL_DATA_IMG) else FALLBACK_IMG
 
 # Global cache for loaded image metadata and thumbnail
 CACHE: Dict[str, Any] = {
