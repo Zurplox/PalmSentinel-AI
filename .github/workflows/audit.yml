@@ -37,9 +37,9 @@ jobs:
           from engine.detector import PalmDetector
           from engine.roi_utils import calculate_polygon_area, calculate_sph
           d = PalmDetector('mature')
-          print('PalmDetector initialized successfully:', d.preset.name)
+          print('PalmDetector initialized successfully:', d.config.name)
           area = calculate_polygon_area([[0,0], [1000,0], [1000,1000], [0,1000]], gsd_cm=4.0)
-          print(f'Test polygon area: {area[\"area_hectares\"]:.4f} Ha')
-          sph = calculate_sph(136, area[\"area_hectares\"])
-          print(f'Calculated SPH: {sph[\"sph\"]} ({sph[\"status\"]})')
+          print(f'Test polygon area: {area["area_hectares"]:.4f} Ha')
+          sph = calculate_sph(136, area["area_hectares"])
+          print(f'Calculated SPH: {sph["sph"]} ({sph["status"]})')
           "
