@@ -17,6 +17,7 @@ ENV/
 *.png
 !static/*.png
 !static/*.jpg
+!data/demo_palm_estate.jpg
 
 # Outputs
 output/

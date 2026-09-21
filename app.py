@@ -26,11 +26,20 @@ from engine.tiler import TiledProcessor
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # Allow up to 1GB orthophoto uploads
 
-# Default image path (checks local data folder first, falls back to original download)
+# Default image path (checks local full photo, fallback, then bundled demo photo)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_DATA_IMG = os.path.join(BASE_DIR, "data", "Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg")
+LOCAL_DEMO_IMG = os.path.join(BASE_DIR, "data", "demo_palm_estate.jpg")
 FALLBACK_IMG = r"D:\Downloads\Jalan-Lintas-S5080iak-Tumang-3-7-2026-orthophoto-2.jpg"
-DEFAULT_IMAGE_PATH = LOCAL_DATA_IMG if os.path.exists(LOCAL_DATA_IMG) else FALLBACK_IMG
+
+if os.path.exists(LOCAL_DATA_IMG):
+    DEFAULT_IMAGE_PATH = LOCAL_DATA_IMG
+elif os.path.exists(FALLBACK_IMG):
+    DEFAULT_IMAGE_PATH = FALLBACK_IMG
+elif os.path.exists(LOCAL_DEMO_IMG):
+    DEFAULT_IMAGE_PATH = LOCAL_DEMO_IMG
+else:
+    DEFAULT_IMAGE_PATH = ""
 
 # Global cache for loaded image metadata and thumbnail
 CACHE: Dict[str, Any] = {
@@ -41,6 +50,7 @@ CACHE: Dict[str, Any] = {
     "overview_image": None,
     "overview_width": 0,
     "overview_height": 0,
+    "overview_jpeg_bytes": None,
     "scale_factor": 1.0,  # full_size / overview_size
 }
 
@@ -74,9 +84,10 @@ def get_or_load_image(path: Optional[str] = None) -> bool:
     CACHE["overview_image"] = overview
     CACHE["overview_width"] = overview_w
     CACHE["overview_height"] = overview_h
-    CACHE["scale_factor"] = w / float(overview_w)
+    CACHE["scale_factor"] = CACHE["full_width"] / float(overview_w)
+    CACHE["overview_jpeg_bytes"] = None  # Reset cached overview bytes
 
-    print(f"[PalmSensus] Image loaded in {time.time()-t0:.2f}s: {w}x{h} px. Overview: {overview_w}x{overview_h} px (scale: {CACHE['scale_factor']:.3f})")
+    print(f"[PalmSensus] Image loaded in {time.time() - t0:.2f}s: {w}x{h} px. Overview: {overview_w}x{overview_h} px (scale: {CACHE['scale_factor']:.3f})")
     return True
 
 @app.route("/")
@@ -113,8 +124,8 @@ def get_image_info():
 
 @app.route("/api/list-images", methods=["GET"])
 def list_available_images():
-    """
-    Lists all orthophotos available in F:\PalmSentinel-AI\data\
+    r"""
+    Lists all orthophotos available in data/ directory
     """
     data_dir = os.path.join(BASE_DIR, "data")
     os.makedirs(data_dir, exist_ok=True)
@@ -179,9 +190,16 @@ def get_overview_image():
     if not get_or_load_image():
         return "Image not found", 404
     
-    # Encode overview to JPEG
-    _, buffer = cv2.imencode(".jpg", CACHE["overview_image"], [cv2.IMWRITE_JPEG_QUALITY, 85])
-    return Response(buffer.tobytes(), mimetype="image/jpeg")
+    # Return pre-encoded JPEG bytes for blistering 0ms response time
+    if CACHE.get("overview_jpeg_bytes") is None:
+        _, buffer = cv2.imencode(".jpg", CACHE["overview_image"], [cv2.IMWRITE_JPEG_QUALITY, 85])
+        CACHE["overview_jpeg_bytes"] = buffer.tobytes()
+
+    return Response(
+        CACHE["overview_jpeg_bytes"],
+        mimetype="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 @app.route("/api/count", methods=["POST"])
 def count_trees():
@@ -423,7 +441,11 @@ def get_viewport_patch():
             crop = cv2.resize(crop, (int(round(cw * s)), int(round(ch * s))), interpolation=cv2.INTER_AREA)
 
         _, buffer = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 88])
-        return Response(buffer.tobytes(), mimetype="image/jpeg")
+        return Response(
+            buffer.tobytes(),
+            mimetype="image/jpeg",
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
     except Exception as e:
         return f"Error: {str(e)}", 500
 
@@ -465,7 +487,11 @@ def get_tree_sample():
             patch = square
 
         _, buffer = cv2.imencode(".jpg", patch, [cv2.IMWRITE_JPEG_QUALITY, 95])
-        return Response(buffer.tobytes(), mimetype="image/jpeg")
+        return Response(
+            buffer.tobytes(),
+            mimetype="image/jpeg",
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
     except Exception as e:
         return f"Error: {str(e)}", 500
 
