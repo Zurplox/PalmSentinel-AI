@@ -24,7 +24,7 @@ from engine.roi_utils import calculate_polygon_area, calculate_sph, filter_point
 from engine.tiler import TiledProcessor
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # Allow up to 1GB orthophoto uploads
+app.config['MAX_CONTENT_LENGTH'] = 2048 * 1024 * 1024  # Allow up to 2GB orthophoto uploads
 
 # Default image path (checks local full photo, fallback, then bundled demo photo)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

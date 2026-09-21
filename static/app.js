@@ -141,6 +141,8 @@ const btnTogglePathInput = document.getElementById('btn-toggle-path-input');
 const pathInputBox = document.getElementById('path-input-box');
 const inputCustomPath = document.getElementById('input-custom-path');
 const btnLoadPath = document.getElementById('btn-load-path');
+const btnTopUpload = document.getElementById('btn-top-upload');
+const dropzoneOverlay = document.getElementById('dropzone-overlay');
 
 // Initialize
 async function initApp() {
@@ -250,7 +252,8 @@ async function switchOrUploadPhoto(formDataOrJson) {
             newImg.src = '/api/overview-image?t=' + Date.now();
 
             await loadAvailableImages();
-            alert("✅ Successfully loaded orthophoto: " + data.filename);
+            lblPatchStatus.textContent = `⚡ Loaded ${data.filename}`;
+            alert(`✅ Successfully loaded local orthophoto: ${data.filename}\n\n🔒 Image is stored 100% locally on your PC (data/) and is excluded from Git/GitHub.`);
         } else {
             alert("Error loading photo: " + (data.error || "Unknown error"));
         }
@@ -704,6 +707,10 @@ function setupEventListeners() {
         });
     }
 
+    if (btnTopUpload && fileInput) {
+        btnTopUpload.addEventListener('click', () => fileInput.click());
+    }
+
     if (btnTogglePathInput && pathInputBox) {
         btnTogglePathInput.addEventListener('click', () => {
             pathInputBox.classList.toggle('hidden');
@@ -717,17 +724,29 @@ function setupEventListeners() {
         });
     }
 
-    // Drag & Drop on Canvas Container
-    container.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        container.style.outline = '3px dashed #10b981';
+    // Interactive Drag & Drop on Canvas Container
+    ['dragenter', 'dragover'].forEach(evtName => {
+        container.addEventListener(evtName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (dropzoneOverlay) dropzoneOverlay.classList.remove('hidden');
+        });
     });
-    container.addEventListener('dragleave', () => {
-        container.style.outline = 'none';
+
+    ['dragleave'].forEach(evtName => {
+        container.addEventListener(evtName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.relatedTarget === null || !container.contains(e.relatedTarget)) {
+                if (dropzoneOverlay) dropzoneOverlay.classList.add('hidden');
+            }
+        });
     });
+
     container.addEventListener('drop', (e) => {
         e.preventDefault();
-        container.style.outline = 'none';
+        e.stopPropagation();
+        if (dropzoneOverlay) dropzoneOverlay.classList.add('hidden');
         if (e.dataTransfer && e.dataTransfer.files.length > 0) {
             const fd = new FormData();
             fd.append('file', e.dataTransfer.files[0]);

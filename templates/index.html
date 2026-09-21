@@ -36,6 +36,9 @@
         </div>
 
         <div class="flex items-center space-x-2">
+            <button id="btn-top-upload" class="px-3.5 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg border border-emerald-400/40 transition font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/40 cursor-pointer" title="Upload your own drone photo (stays 100% locally on your PC, never uploaded to GitHub)">
+                <span>📤 Upload Photo</span>
+            </button>
             <button id="btn-fit-screen" class="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 transition" title="Fit Entire Orthophoto">
                 🔍 Fit View
             </button>
@@ -53,40 +56,51 @@
             <div class="p-4 space-y-4">
 
                 <!-- 0. DRONE PHOTO SELECTOR & UPLOADER -->
-                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 shadow-md space-y-2.5">
+                <div class="bg-slate-950 p-3.5 rounded-xl border border-emerald-500/40 shadow-lg space-y-3">
                     <div class="flex items-center justify-between">
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                             <span>📸 Drone Orthophoto</span>
                         </label>
                         <span id="badge-photo-size" class="text-[10px] text-emerald-400 font-mono">Loading...</span>
                     </div>
 
-                    <!-- Dropdown of available photos in F:\PalmSentinel-AI\data -->
-                    <select id="select-active-photo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
-                        <option value="">Loading flights...</option>
-                    </select>
+                    <!-- Primary Big Upload Button -->
+                    <button id="btn-upload-file" class="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/50 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-950/60">
+                        <span class="text-sm">📁</span>
+                        <span>Upload My Drone Photo</span>
+                        <span class="text-[10px] bg-emerald-800/80 px-1.5 py-0.5 rounded font-normal">.JPG / .TIF / .PNG</span>
+                    </button>
+                    <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.tif,.tiff" class="hidden">
 
-                    <div class="grid grid-cols-2 gap-2">
-                        <!-- Browse / Upload File -->
-                        <button id="btn-upload-file" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition cursor-pointer">
-                            <span>📁 Browse / Upload</span>
-                        </button>
-                        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.tif,.tiff" class="hidden">
+                    <!-- Switch Existing Flights -->
+                    <div class="space-y-1">
+                        <span class="text-[10px] text-slate-400 block font-medium">Or choose flight from local data folder:</span>
+                        <select id="select-active-photo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
+                            <option value="">Loading flights...</option>
+                        </select>
+                    </div>
 
-                        <!-- Enter PC Path -->
-                        <button id="btn-toggle-path-input" class="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1 transition cursor-pointer">
-                            <span>📍 Paste PC Path</span>
+                    <!-- Secondary: Paste PC Path -->
+                    <div class="flex items-center justify-between text-[11px] pt-0.5">
+                        <button id="btn-toggle-path-input" class="text-slate-400 hover:text-slate-200 underline decoration-dotted flex items-center gap-1 cursor-pointer">
+                            <span>📍 Or paste local PC path</span>
                         </button>
                     </div>
 
                     <!-- Collapsible Local Path Box -->
-                    <div id="path-input-box" class="hidden space-y-1.5 pt-1 border-t border-slate-800/80">
+                    <div id="path-input-box" class="hidden space-y-1.5 pt-1 border-t border-slate-800">
                         <div class="flex items-center space-x-1.5">
-                            <input id="input-custom-path" type="text" placeholder="D:\Photos\ortho.jpg..." class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
-                            <button id="btn-load-path" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold transition">
+                            <input id="input-custom-path" type="text" placeholder="D:\DroneFlights\orthophoto.jpg..." class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
+                            <button id="btn-load-path" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold transition">
                                 Load
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Privacy Guarantee Badge -->
+                    <div class="bg-emerald-950/40 border border-emerald-900/60 rounded-lg p-2.5 flex items-start gap-2 text-[10px] text-emerald-300/90 leading-tight">
+                        <span class="text-sm">🔒</span>
+                        <span><strong>100% Local & Private:</strong> Images stay on your local PC in <code>data/</code> and are ignored by Git. They are <strong>never</strong> uploaded to GitHub or the cloud.</span>
                     </div>
                 </div>
 
@@ -287,6 +301,17 @@
         <!-- Center Viewport Canvas -->
         <main id="canvas-container" class="flex-1 relative bg-black overflow-hidden flex items-center justify-center cursor-crosshair">
             <canvas id="main-canvas" class="shadow-2xl"></canvas>
+
+            <!-- Interactive Drag & Drop Overlay -->
+            <div id="dropzone-overlay" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center border-4 border-dashed border-emerald-500 pointer-events-none transition">
+                <div class="text-6xl mb-3 animate-bounce">📥</div>
+                <h3 class="text-xl font-bold text-white mb-1">Drop Your Drone Orthophoto Here</h3>
+                <p class="text-xs text-emerald-300">GeoTIFF, JPG, or PNG (up to 2GB supported)</p>
+                <div class="mt-3 bg-emerald-950/80 px-3.5 py-1.5 rounded-full border border-emerald-700/50 text-[11px] text-emerald-300 flex items-center gap-2 shadow-lg">
+                    <span>🔒</span>
+                    <span>100% Local Processing on F: Drive — Never Uploaded to GitHub</span>
+                </div>
+            </div>
 
             <!-- Floating Viewport Controls -->
             <div class="absolute bottom-5 right-5 flex items-center space-x-1 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg p-1.5 shadow-xl text-xs z-10">
