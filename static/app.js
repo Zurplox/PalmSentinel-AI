@@ -31,6 +31,9 @@ const state = {
     polygon: [],
     isDrawingPoly: false,
     hoverPoint: null,
+    isSpacePressed: false,
+    hoveredVertexIndex: -1,
+    draggedVertexIndex: -1,
 
     // Box drawing state
     boxStart: null,
@@ -469,7 +472,7 @@ function render() {
             ctx.lineTo(state.hoverPoint.x, state.hoverPoint.y);
         } else if (!state.isDrawingPoly && state.polygon.length >= 3) {
             ctx.closePath();
-            ctx.fillStyle = "rgba(16, 185, 129, 0.15)";
+            ctx.fillStyle = "rgba(16, 185, 129, 0.16)";
             ctx.fill();
         }
 
@@ -477,15 +480,98 @@ function render() {
         ctx.lineWidth = 2.5 / state.zoom;
         ctx.stroke();
 
-        // Vertex handles
-        ctx.fillStyle = "#34d399";
-        for (let p of state.polygon) {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 4 / state.zoom, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = "#064e3b";
-            ctx.lineWidth = 1 / state.zoom;
-            ctx.stroke();
+        // Real-time Segment Lengths (m) on lines
+        if (state.info && sliderGsd) {
+            const gsdM = parseFloat(sliderGsd.value) / 100.0;
+            const pts = [...state.polygon];
+            if (state.isDrawingPoly && state.hoverPoint) pts.push(state.hoverPoint);
+            else if (!state.isDrawingPoly && pts.length >= 3) pts.push(pts[0]);
+
+            ctx.font = `bold ${Math.max(9, Math.round(11 / state.zoom))}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            for (let i = 0; i < pts.length - 1; i++) {
+                const p1 = pts[i];
+                const p2 = pts[i + 1];
+                const segLenM = (Math.hypot(p2.x - p1.x, p2.y - p1.y) * state.info.scale_factor * gsdM);
+                if (segLenM > 1.0) {
+                    const midX = (p1.x + p2.x) / 2;
+                    const midY = (p1.y + p2.y) / 2;
+                    const text = `${segLenM.toFixed(1)}m`;
+                    const padX = 4 / state.zoom;
+                    const padY = 2 / state.zoom;
+                    const tw = ctx.measureText(text).width + padX * 2;
+                    const th = 13 / state.zoom;
+
+                    ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
+                    ctx.fillRect(midX - tw / 2, midY - th / 2, tw, th);
+                    ctx.strokeStyle = "rgba(16, 185, 129, 0.5)";
+                    ctx.lineWidth = 1 / state.zoom;
+                    ctx.strokeRect(midX - tw / 2, midY - th / 2, tw, th);
+                    ctx.fillStyle = "#34d399";
+                    ctx.fillText(text, midX, midY);
+                }
+            }
+        }
+
+        // Photoshop-Style Interactive Anchor Points (Vertices)
+        for (let i = 0; i < state.polygon.length; i++) {
+            const p = state.polygon[i];
+            const isHovered = (i === state.hoveredVertexIndex);
+            const isDragged = (i === state.draggedVertexIndex);
+
+            const r = (isDragged || isHovered ? 6.5 : 4.5) / state.zoom;
+
+            if (isDragged) {
+                // Dragging: Pulsing Cyan Crosshair Handle
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r * 1.5, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(56, 189, 248, 0.25)";
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = "#38bdf8";
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.5 / state.zoom;
+                ctx.stroke();
+
+                // Crosshair guide
+                const arm = 14 / state.zoom;
+                ctx.strokeStyle = "rgba(56, 189, 248, 0.7)";
+                ctx.lineWidth = 1.2 / state.zoom;
+                ctx.beginPath();
+                ctx.moveTo(p.x - arm, p.y); ctx.lineTo(p.x + arm, p.y);
+                ctx.moveTo(p.x, p.y - arm); ctx.lineTo(p.x, p.y + arm);
+                ctx.stroke();
+
+            } else if (isHovered) {
+                // Hovered: Amber Glow Ring with "move" indicator
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r * 1.6, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(251, 191, 36, 0.3)";
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = "#fbbf24";
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2.0 / state.zoom;
+                ctx.stroke();
+
+            } else {
+                // Default: Clean White Anchor Point with Emerald Border
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+                ctx.strokeStyle = "#047857";
+                ctx.lineWidth = 1.8 / state.zoom;
+                ctx.stroke();
+            }
         }
     }
 
@@ -790,8 +876,22 @@ function setupEventListeners() {
         }
     }, { passive: false });
 
-    // Keyboard Shortcuts (Ctrl+Z to Undo, Esc to Reset Polygon, Ctrl + '+/-' to Zoom)
+    // Keyboard Shortcuts (Ctrl+Z to Undo, Esc to Reset Polygon, Ctrl + '+/-' to Zoom, Space to Pan)
     window.addEventListener('keydown', (e) => {
+        // Spacebar temporary pan (Photoshop-style)
+        if (e.code === 'Space' && !e.repeat) {
+            const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            if (tag !== 'input' && tag !== 'textarea') {
+                e.preventDefault();
+                state.isSpacePressed = true;
+                if (!state.isPanning) {
+                    canvas.style.cursor = 'grab';
+                    container.style.cursor = 'grab';
+                }
+                return;
+            }
+        }
+
         if (e.ctrlKey || e.metaKey) {
             if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd' || e.key === 'Add') {
                 e.preventDefault();
@@ -824,6 +924,15 @@ function setupEventListeners() {
         }
     });
 
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') {
+            state.isSpacePressed = false;
+            if (!state.isPanning) {
+                updateCursorForTool();
+            }
+        }
+    });
+
     // Touch gesture scaling block (Safari / Edge)
     document.addEventListener('gesturestart', (e) => e.preventDefault());
     document.addEventListener('gesturechange', (e) => e.preventDefault());
@@ -839,12 +948,16 @@ function setupEventListeners() {
 function undoPolygonPoint() {
     if (state.polygon.length > 0) {
         state.polygon.pop();
+        state.hoveredVertexIndex = -1;
+        state.draggedVertexIndex = -1;
         if (state.polygon.length === 0) {
             state.isDrawingPoly = false;
             state.hoverPoint = null;
         } else {
             state.isDrawingPoly = true;
         }
+        recalcMetrics();
+        updateCursorForTool();
         render();
     }
 }
@@ -853,6 +966,8 @@ function resetPolygon(fullClear = false) {
     state.polygon = [];
     state.isDrawingPoly = false;
     state.hoverPoint = null;
+    state.hoveredVertexIndex = -1;
+    state.draggedVertexIndex = -1;
     state.boxStart = null;
     state.boxCurrent = null;
     state.isDrawingBox = false;
@@ -860,7 +975,10 @@ function resetPolygon(fullClear = false) {
         state.palms = [];
         state.gaps = [];
         resetStats();
+    } else {
+        recalcMetrics();
     }
+    updateCursorForTool();
     render();
 }
 
@@ -868,37 +986,40 @@ function setupDraggableCard() {
     if (!analyticsCard || !analyticsCardHeader) return;
 
     let isDragging = false;
-    let startX = 0, startY = 0;
-    let origX = 0, origY = 0;
+    let grabOffsetX = 0;
+    let grabOffsetY = 0;
 
     analyticsCardHeader.addEventListener('mousedown', (e) => {
         if (e.target.closest('#btn-toggle-analytics') || e.target.tagName.toLowerCase() === 'button') return;
         isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
 
-        const rect = analyticsCard.getBoundingClientRect();
-        origX = rect.left;
-        origY = rect.top;
+        const cardRect = analyticsCard.getBoundingClientRect();
+        grabOffsetX = e.clientX - cardRect.left;
+        grabOffsetY = e.clientY - cardRect.top;
 
+        // Position card relative to offsetParent coordinate system to eliminate offset jumps
+        const parentRect = (analyticsCard.offsetParent || document.body).getBoundingClientRect();
         analyticsCard.style.right = 'auto';
         analyticsCard.style.bottom = 'auto';
-        analyticsCard.style.left = `${origX}px`;
-        analyticsCard.style.top = `${origY}px`;
+        analyticsCard.style.left = `${cardRect.left - parentRect.left}px`;
+        analyticsCard.style.top = `${cardRect.top - parentRect.top}px`;
+
         analyticsCardHeader.style.cursor = 'grabbing';
         e.preventDefault();
     });
 
     window.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
 
-        const maxLeft = Math.max(10, window.innerWidth - analyticsCard.offsetWidth - 10);
-        const maxTop = Math.max(10, window.innerHeight - analyticsCard.offsetHeight - 10);
+        const parentRect = (analyticsCard.offsetParent || document.body).getBoundingClientRect();
+        let newLeft = e.clientX - parentRect.left - grabOffsetX;
+        let newTop = e.clientY - parentRect.top - grabOffsetY;
 
-        const newLeft = Math.max(10, Math.min(maxLeft, origX + dx));
-        const newTop = Math.max(10, Math.min(maxTop, origY + dy));
+        const maxLeft = Math.max(10, parentRect.width - analyticsCard.offsetWidth - 10);
+        const maxTop = Math.max(10, parentRect.height - analyticsCard.offsetHeight - 10);
+
+        newLeft = Math.max(10, Math.min(maxLeft, newLeft));
+        newTop = Math.max(10, Math.min(maxTop, newTop));
 
         analyticsCard.style.left = `${newLeft}px`;
         analyticsCard.style.top = `${newTop}px`;
@@ -1008,21 +1129,38 @@ function setTool(tool) {
     toolEditBtn.classList.toggle('active', tool === 'edit');
 
     if (tool === 'pan') {
-        toolInstruction.textContent = "Click & drag anywhere to pan the map. Use mouse wheel or pinch to zoom.";
-        canvas.style.cursor = "grab";
-        container.style.cursor = "grab";
+        toolInstruction.textContent = "Click & drag anywhere to pan the map. Hold Spacebar anytime to pan temporarily.";
     } else if (tool === 'poly') {
-        toolInstruction.textContent = "Click points around block. Ctrl+Z to undo point, Esc to reset, double-click to close.";
-        canvas.style.cursor = "crosshair";
-        container.style.cursor = "crosshair";
+        toolInstruction.textContent = "Click to place points. Drag points to adjust. Alt+Click point to delete. Hold Space to pan.";
     } else if (tool === 'box') {
-        toolInstruction.textContent = "Click and drag to select a rectangular block area.";
-        canvas.style.cursor = "crosshair";
-        container.style.cursor = "crosshair";
+        toolInstruction.textContent = "Click and drag to select a rectangular block area. Hold Space to pan.";
     } else if (tool === 'edit') {
         toolInstruction.textContent = "Left-click empty space to ADD a palm. Click existing marker to DELETE it.";
-        canvas.style.cursor = "pointer";
-        container.style.cursor = "default";
+    }
+    updateCursorForTool();
+}
+
+function updateCursorForTool() {
+    if (state.isSpacePressed) {
+        canvas.style.cursor = 'grab';
+        container.style.cursor = 'grab';
+        return;
+    }
+    if (state.isSamplingMode) {
+        canvas.style.cursor = 'crosshair';
+        container.style.cursor = 'crosshair';
+    } else if (state.currentTool === 'pan') {
+        canvas.style.cursor = 'grab';
+        container.style.cursor = 'grab';
+    } else if (state.currentTool === 'edit') {
+        canvas.style.cursor = 'pointer';
+        container.style.cursor = 'default';
+    } else if (state.hoveredVertexIndex !== -1) {
+        canvas.style.cursor = 'move';
+        container.style.cursor = 'move';
+    } else {
+        canvas.style.cursor = 'crosshair';
+        container.style.cursor = 'crosshair';
     }
 }
 
@@ -1091,8 +1229,8 @@ function handleMouseDown(e) {
         return;
     }
 
-    // Pan with Pan Tool (left button), Middle Mouse Button, Right Button, or Shift + Left Button
-    if (state.currentTool === 'pan' || e.button === 1 || e.button === 2 || e.shiftKey) {
+    // Pan with Spacebar (Photoshop temporary pan), Pan Tool, Middle Mouse, Right Click, or Shift+Left Click
+    if (state.isSpacePressed || state.currentTool === 'pan' || e.button === 1 || e.button === 2 || e.shiftKey) {
         state.isPanning = true;
         state.startPanX = mx - state.panX;
         state.startPanY = my - state.panY;
@@ -1103,6 +1241,30 @@ function handleMouseDown(e) {
     }
 
     if (e.button === 0) { // Left Click
+        // 1. Check if clicking an existing polygon vertex (Photoshop Anchor Point interaction)
+        if (state.hoveredVertexIndex !== -1) {
+            if (e.altKey) {
+                // Alt + Click on vertex: Photoshop Pen Tool feature: Delete that vertex!
+                state.polygon.splice(state.hoveredVertexIndex, 1);
+                state.hoveredVertexIndex = -1;
+                state.draggedVertexIndex = -1;
+                if (state.polygon.length === 0) {
+                    state.isDrawingPoly = false;
+                }
+                recalcMetrics();
+                updateCursorForTool();
+                render();
+                return;
+            } else {
+                // Drag the vertex
+                state.draggedVertexIndex = state.hoveredVertexIndex;
+                canvas.style.cursor = "grabbing";
+                container.style.cursor = "grabbing";
+                render();
+                return;
+            }
+        }
+
         if (state.currentTool === 'poly') {
             if (!state.isDrawingPoly) {
                 state.polygon = [pt];
@@ -1117,6 +1279,7 @@ function handleMouseDown(e) {
                     state.polygon.push(pt);
                 }
             }
+            recalcMetrics();
             render();
         } else if (state.currentTool === 'box') {
             state.isDrawingBox = true;
@@ -1148,6 +1311,41 @@ function handleMouseMove(e) {
         return;
     }
 
+    // Dragging an existing polygon anchor point (Photoshop vertex manipulation)
+    if (state.draggedVertexIndex !== -1 && state.polygon[state.draggedVertexIndex]) {
+        state.polygon[state.draggedVertexIndex] = { x: pt.x, y: pt.y };
+        recalcMetrics();
+        render();
+        return;
+    }
+
+    // Check vertex hovering when not panning or dragging
+    if (state.polygon.length > 0 && !state.isSpacePressed && state.currentTool !== 'pan') {
+        const hitRadius = 14 / state.zoom;
+        let closestIdx = -1;
+        let minDist = hitRadius;
+
+        for (let i = 0; i < state.polygon.length; i++) {
+            const p = state.polygon[i];
+            const d = Math.hypot(p.x - pt.x, p.y - pt.y);
+            if (d < minDist) {
+                minDist = d;
+                closestIdx = i;
+            }
+        }
+
+        const prevHover = state.hoveredVertexIndex;
+        state.hoveredVertexIndex = closestIdx;
+        if (prevHover !== closestIdx) {
+            updateCursorForTool();
+            render();
+        }
+    } else if (state.hoveredVertexIndex !== -1) {
+        state.hoveredVertexIndex = -1;
+        updateCursorForTool();
+        render();
+    }
+
     if (state.currentTool === 'poly' && state.isDrawingPoly) {
         state.hoverPoint = pt;
         render();
@@ -1158,11 +1356,17 @@ function handleMouseMove(e) {
 }
 
 function handleMouseUp(e) {
+    if (state.draggedVertexIndex !== -1) {
+        state.draggedVertexIndex = -1;
+        recalcMetrics();
+        scheduleViewportPatch();
+        updateCursorForTool();
+        render();
+    }
+
     if (state.isPanning) {
         state.isPanning = false;
-        const cur = state.isSamplingMode ? "crosshair" : (state.currentTool === 'pan' ? "grab" : (state.currentTool === 'edit' ? "pointer" : "crosshair"));
-        canvas.style.cursor = cur;
-        container.style.cursor = cur;
+        updateCursorForTool();
         scheduleViewportPatch();
     }
 
@@ -1180,6 +1384,7 @@ function handleMouseUp(e) {
                 { x: x2, y: y2 },
                 { x: x1, y: y2 }
             ];
+            recalcMetrics();
         }
         state.boxStart = null;
         state.boxCurrent = null;
