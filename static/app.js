@@ -94,6 +94,7 @@ const btnCount = document.getElementById('btn-count');
 const countSpinner = document.getElementById('count-spinner');
 const countBtnText = document.getElementById('count-btn-text');
 const btnClearRoi = document.getElementById('btn-clear-roi');
+const btnUndoPoint = document.getElementById('btn-undo-point');
 const inputBlockName = document.getElementById('input-block-name');
 const chkMissingPalms = document.getElementById('chk-missing-palms');
 const chkDensityHeatmap = document.getElementById('chk-density-heatmap');
@@ -109,7 +110,12 @@ const toolBoxBtn = document.getElementById('tool-box');
 const toolEditBtn = document.getElementById('tool-edit');
 const toolInstruction = document.getElementById('tool-instruction');
 
-// Analytics Card
+// Analytics Card (Movable & Collapsible)
+const analyticsCard = document.getElementById('analytics-card');
+const analyticsCardHeader = document.getElementById('analytics-card-header');
+const analyticsCardBody = document.getElementById('analytics-card-body');
+const btnToggleAnalytics = document.getElementById('btn-toggle-analytics');
+const analyticsMiniBadge = document.getElementById('analytics-mini-badge');
 const statPalms = document.getElementById('stat-palms');
 const statArea = document.getElementById('stat-area');
 const statSph = document.getElementById('stat-sph');
@@ -726,16 +732,13 @@ function setupEventListeners() {
     chkShowCircles.addEventListener('change', () => { state.showCircles = chkShowCircles.checked; render(); });
 
     // Buttons
-    btnCount.addEventListener('click', runCount);
-    btnClearRoi.addEventListener('click', () => {
-        state.polygon = [];
-        state.isDrawingPoly = false;
-        state.hoverPoint = null;
-        state.palms = [];
-        state.gaps = [];
-        resetStats();
-        render();
-    });
+    if (btnCount) btnCount.addEventListener('click', runCount);
+    if (btnUndoPoint) btnUndoPoint.addEventListener('click', undoPolygonPoint);
+    if (btnClearRoi) {
+        btnClearRoi.addEventListener('click', () => {
+            resetPolygon(true);
+        });
+    }
 
     if (btnFitScreen) btnFitScreen.addEventListener('click', fitToScreen);
     if (btnNativeRes) {
@@ -787,7 +790,7 @@ function setupEventListeners() {
         }
     }, { passive: false });
 
-    // Keyboard Shortcuts (Ctrl + '+' / '-' / '0' zooms image, not UI)
+    // Keyboard Shortcuts (Ctrl+Z to Undo, Esc to Reset Polygon, Ctrl + '+/-' to Zoom)
     window.addEventListener('keydown', (e) => {
         if (e.ctrlKey || e.metaKey) {
             if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd' || e.key === 'Add') {
@@ -799,6 +802,24 @@ function setupEventListeners() {
             } else if (e.key === '0' || e.code === 'Numpad0') {
                 e.preventDefault();
                 fitToScreen();
+            } else if (e.key === 'z' || e.key === 'Z') {
+                e.preventDefault();
+                undoPolygonPoint();
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            resetPolygon(false);
+            if (state.isSamplingMode) {
+                state.isSamplingMode = false;
+                btnSampleTree.classList.remove("bg-emerald-600", "text-white", "animate-pulse");
+                btnSampleTree.textContent = "🎯 Click on Map to Sample a Tree";
+                canvas.style.cursor = "default";
+            }
+        } else if (e.key === 'Backspace' || e.key === 'Delete') {
+            const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            if (tag !== 'input' && tag !== 'textarea') {
+                e.preventDefault();
+                undoPolygonPoint();
             }
         }
     });
@@ -810,6 +831,100 @@ function setupEventListeners() {
 
     // Touchscreen Multi-Touch Pinch Zoom Support
     setupTouchPinchZoom();
+
+    // Draggable & Collapsible Sensus Summary Card
+    setupDraggableCard();
+}
+
+function undoPolygonPoint() {
+    if (state.polygon.length > 0) {
+        state.polygon.pop();
+        if (state.polygon.length === 0) {
+            state.isDrawingPoly = false;
+            state.hoverPoint = null;
+        } else {
+            state.isDrawingPoly = true;
+        }
+        render();
+    }
+}
+
+function resetPolygon(fullClear = false) {
+    state.polygon = [];
+    state.isDrawingPoly = false;
+    state.hoverPoint = null;
+    state.boxStart = null;
+    state.boxCurrent = null;
+    state.isDrawingBox = false;
+    if (fullClear) {
+        state.palms = [];
+        state.gaps = [];
+        resetStats();
+    }
+    render();
+}
+
+function setupDraggableCard() {
+    if (!analyticsCard || !analyticsCardHeader) return;
+
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let origX = 0, origY = 0;
+
+    analyticsCardHeader.addEventListener('mousedown', (e) => {
+        if (e.target.closest('#btn-toggle-analytics') || e.target.tagName.toLowerCase() === 'button') return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        const rect = analyticsCard.getBoundingClientRect();
+        origX = rect.left;
+        origY = rect.top;
+
+        analyticsCard.style.right = 'auto';
+        analyticsCard.style.bottom = 'auto';
+        analyticsCard.style.left = `${origX}px`;
+        analyticsCard.style.top = `${origY}px`;
+        analyticsCardHeader.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        const maxLeft = Math.max(10, window.innerWidth - analyticsCard.offsetWidth - 10);
+        const maxTop = Math.max(10, window.innerHeight - analyticsCard.offsetHeight - 10);
+
+        const newLeft = Math.max(10, Math.min(maxLeft, origX + dx));
+        const newTop = Math.max(10, Math.min(maxTop, origY + dy));
+
+        analyticsCard.style.left = `${newLeft}px`;
+        analyticsCard.style.top = `${newTop}px`;
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            analyticsCardHeader.style.cursor = 'move';
+        }
+    });
+
+    if (btnToggleAnalytics && analyticsCardBody) {
+        let isCollapsed = false;
+        btnToggleAnalytics.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isCollapsed = !isCollapsed;
+            analyticsCardBody.classList.toggle('hidden', isCollapsed);
+            btnToggleAnalytics.textContent = isCollapsed ? '▲' : '▼';
+            btnToggleAnalytics.title = isCollapsed ? 'Expand Sensus Card' : 'Minimize Sensus Card';
+            if (analyticsMiniBadge) {
+                analyticsMiniBadge.classList.toggle('hidden', !isCollapsed);
+                analyticsMiniBadge.textContent = `${state.palms.length} palms`;
+            }
+        });
+    }
 }
 
 function setupTouchPinchZoom() {
@@ -897,7 +1012,7 @@ function setTool(tool) {
         canvas.style.cursor = "grab";
         container.style.cursor = "grab";
     } else if (tool === 'poly') {
-        toolInstruction.textContent = "Click on the image to place polygon vertices. Double-click or click start point to close.";
+        toolInstruction.textContent = "Click points around block. Ctrl+Z to undo point, Esc to reset, double-click to close.";
         canvas.style.cursor = "crosshair";
         container.style.cursor = "crosshair";
     } else if (tool === 'box') {
@@ -1211,6 +1326,9 @@ async function fetchGaps() {
 
 function recalcMetrics() {
     statPalms.textContent = state.palms.length.toLocaleString();
+    if (analyticsMiniBadge) {
+        analyticsMiniBadge.textContent = `${state.palms.length.toLocaleString()} palms`;
+    }
     if (state.polygon.length >= 3) {
         let areaPx = 0;
         for (let i = 0; i < state.polygon.length; i++) {
@@ -1241,6 +1359,9 @@ function resetStats() {
     statStatus.textContent = "Draw an area and click 'Run Palm Sensus Count'.";
     statTime.textContent = "0.0s";
     statGapsCard.classList.add('hidden');
+    if (analyticsMiniBadge) {
+        analyticsMiniBadge.textContent = "0 palms";
+    }
 }
 
 // Export Handlers

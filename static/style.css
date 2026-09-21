@@ -85,3 +85,18 @@ html, body {
     -webkit-user-select: none;
     display: block;
 }
+
+/* Draggable Analytics Card */
+#analytics-card {
+    cursor: default;
+    user-select: none;
+}
+
+#analytics-card-header {
+    cursor: grab;
+    touch-action: none;
+}
+
+#analytics-card-header:active {
+    cursor: grabbing;
+}

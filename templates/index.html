@@ -223,13 +223,18 @@
 
                 <!-- 5. BLOCK NAME & EXECUTION -->
                 <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Plantation Block Name</label>
-                    <div class="flex items-center space-x-2">
-                        <input id="input-block-name" type="text" value="Blok 1 - TM Utara" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500" placeholder="Block name...">
-                        <button id="btn-clear-roi" class="px-2.5 py-1.5 text-xs bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 rounded transition" title="Clear selection">
-                            Clear
-                        </button>
+                    <div class="flex justify-between items-center">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Plantation Block Name</label>
+                        <div class="flex items-center space-x-1.5">
+                            <button id="btn-undo-point" class="px-2 py-1 text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded transition flex items-center gap-1 font-medium" title="Undo last polygon vertex (Ctrl+Z / Backspace)">
+                                <span>↶</span> Undo
+                            </button>
+                            <button id="btn-clear-roi" class="px-2 py-1 text-[11px] bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 rounded transition font-medium" title="Reset selection (Esc)">
+                                <span>✕</span> Reset
+                            </button>
+                        </div>
                     </div>
+                    <input id="input-block-name" type="text" value="Blok 1 - TM Utara" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500" placeholder="Block name...">
                 </div>
 
                 <!-- Execute Count Button -->
@@ -298,57 +303,72 @@
             </div>
         </main>
 
-        <!-- Floating Live Sensus Summary Card (Top Right) -->
-        <div id="analytics-card" class="absolute top-4 right-4 bg-slate-900/95 backdrop-blur border border-emerald-500/30 rounded-xl p-4 shadow-2xl z-10 w-72 space-y-3 pointer-events-auto">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Sensus Summary</span>
-                <span id="stat-time" class="text-[10px] text-slate-400 font-mono">0.0s</span>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2">
-                <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800/80">
-                    <span class="text-[10px] text-slate-400 uppercase">Total Palms</span>
-                    <p id="stat-palms" class="text-2xl font-black text-emerald-400 font-mono leading-none mt-1">0</p>
-                    <span class="text-[9px] text-slate-500">pokok terdeteksi</span>
+        <!-- Floating Live Sensus Summary Card (Movable & Collapsible) -->
+        <div id="analytics-card" class="absolute top-4 right-4 bg-slate-900/95 backdrop-blur border border-emerald-500/30 rounded-xl shadow-2xl z-20 w-72 pointer-events-auto">
+            <!-- Draggable Header -->
+            <div id="analytics-card-header" class="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-800 cursor-move select-none bg-slate-950/60 rounded-t-xl hover:bg-slate-850 transition">
+                <div class="flex items-center space-x-2">
+                    <span class="text-slate-500 text-xs font-mono select-none" title="Drag to move this card anywhere on screen">⠿</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                        <span>Sensus Summary</span>
+                    </span>
+                    <span id="analytics-mini-badge" class="hidden text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-800/40">0 palms</span>
                 </div>
-                <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800/80">
-                    <span class="text-[10px] text-slate-400 uppercase">Block Area</span>
-                    <p id="stat-area" class="text-2xl font-black text-white font-mono leading-none mt-1">0.00</p>
-                    <span class="text-[9px] text-slate-500">Hektar (Ha)</span>
-                </div>
-            </div>
-
-            <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
-                <div class="flex justify-between items-center text-xs">
-                    <span class="text-slate-400">Stand Density (SPH):</span>
-                    <strong id="stat-sph" class="font-mono text-emerald-400 text-sm">0 SPH</strong>
-                </div>
-                <p id="stat-status" class="text-[11px] text-slate-400 leading-tight">
-                    Draw an area and click "Run Palm Sensus Count" to evaluate.
-                </p>
-            </div>
-
-            <!-- Gaps & Mortality Stats (Appears after count) -->
-            <div id="stat-gaps-card" class="hidden bg-amber-950/30 p-2.5 rounded-lg border border-amber-800/50 space-y-1">
-                <div class="flex justify-between items-center text-xs">
-                    <span class="text-amber-300">Titik Sisipan / Gaps:</span>
-                    <strong id="stat-gaps" class="font-mono text-amber-400 text-sm">0</strong>
-                </div>
-                <div class="flex justify-between text-[11px] text-slate-400">
-                    <span>Mortality / Vacancy:</span>
-                    <span id="stat-mortality" class="font-mono text-amber-300">0.0%</span>
+                <div class="flex items-center space-x-2">
+                    <span id="stat-time" class="text-[10px] text-slate-400 font-mono">0.0s</span>
+                    <button id="btn-toggle-analytics" class="w-6 h-6 flex items-center justify-center rounded hover:bg-slate-800 text-slate-400 hover:text-white transition text-xs font-bold" title="Minimize / Expand Sensus Card">
+                        ▼
+                    </button>
                 </div>
             </div>
 
-            <div class="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800 text-slate-400">
-                <label class="flex items-center space-x-1.5 cursor-pointer">
-                    <input id="chk-show-numbers" type="checkbox" checked class="accent-emerald-500 rounded">
-                    <span>Show IDs</span>
-                </label>
-                <label class="flex items-center space-x-1.5 cursor-pointer">
-                    <input id="chk-show-circles" type="checkbox" checked class="accent-emerald-500 rounded">
-                    <span>Show Circles</span>
-                </label>
+            <!-- Card Body (Collapsible) -->
+            <div id="analytics-card-body" class="p-3.5 space-y-3">
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800/80">
+                        <span class="text-[10px] text-slate-400 uppercase">Total Palms</span>
+                        <p id="stat-palms" class="text-2xl font-black text-emerald-400 font-mono leading-none mt-1">0</p>
+                        <span class="text-[9px] text-slate-500">pokok terdeteksi</span>
+                    </div>
+                    <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800/80">
+                        <span class="text-[10px] text-slate-400 uppercase">Block Area</span>
+                        <p id="stat-area" class="text-2xl font-black text-white font-mono leading-none mt-1">0.00</p>
+                        <span class="text-[9px] text-slate-500">Hektar (Ha)</span>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 space-y-1">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-400">Stand Density (SPH):</span>
+                        <strong id="stat-sph" class="font-mono text-emerald-400 text-sm">0 SPH</strong>
+                    </div>
+                    <p id="stat-status" class="text-[11px] text-slate-400 leading-tight">
+                        Draw an area and click "Run Palm Sensus Count" to evaluate.
+                    </p>
+                </div>
+
+                <!-- Gaps & Mortality Stats (Appears after count) -->
+                <div id="stat-gaps-card" class="hidden bg-amber-950/30 p-2.5 rounded-lg border border-amber-800/50 space-y-1">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-amber-300">Titik Sisipan / Gaps:</span>
+                        <strong id="stat-gaps" class="font-mono text-amber-400 text-sm">0</strong>
+                    </div>
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>Mortality / Vacancy:</span>
+                        <span id="stat-mortality" class="font-mono text-amber-300">0.0%</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800 text-slate-400">
+                    <label class="flex items-center space-x-1.5 cursor-pointer">
+                        <input id="chk-show-numbers" type="checkbox" checked class="accent-emerald-500 rounded">
+                        <span>Show IDs</span>
+                    </label>
+                    <label class="flex items-center space-x-1.5 cursor-pointer">
+                        <input id="chk-show-circles" type="checkbox" checked class="accent-emerald-500 rounded">
+                        <span>Show Circles</span>
+                    </label>
+                </div>
             </div>
         </div>
 
