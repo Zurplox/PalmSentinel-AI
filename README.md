@@ -1,147 +1,151 @@
-# 🌴 PalmSensus AI — Enterprise Drone Oil Palm Counting & Estate Analytics
+# 🌴 PalmSentinel AI Pro — SawitVision Enterprise
 
-> **High-Precision Computer Vision & Interactive Web Sensus Platform for Ultra-High-Resolution (100MP+) Drone Orthomosaics.**
+> **High-Precision Computer Vision & Interactive Drone Oil Palm Sensus Platform for Ultra-High-Resolution (100MP+) Orthomosaics.**
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Zurplox%2FPalmSentinel--AI-181717.svg?logo=github)](https://github.com/Zurplox/PalmSentinel-AI)
 [![Python](https://img.shields.io/badge/Python-3.9%20|%203.10%20|%203.11%20|%203.12%20|%203.14-blue.svg)](https://python.org)
 [![OpenCV](https://img.shields.io/badge/OpenCV-5.0+-green.svg)](https://opencv.org)
-[![Flask](https://img.shields.io/badge/Flask-3.1+-lightgrey.svg)](https://palletsprojects.com/p/flask/)
-[![License](https://img.shields.io/badge/License-Commercial%20Agri-orange.svg)]()
+[![Audit](https://img.shields.io/badge/System%20Audit-42%2F42%20PASS%20(100%25)-emerald.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
 ---
 
 ## 📌 Executive Overview
 
-Counting oil palms (*Elaeis guineensis*) across thousands of hectares manually is slow, error-prone, and labor-intensive. Standard AI detectors often crash or run out of memory when fed raw 100+ megapixel drone orthophotos.
+Counting oil palms (*Elaeis guineensis*) manually across thousands of hectares is slow, error-prone, and costly. Standard AI models frequently crash or exhaust memory when processing raw 100+ megapixel drone orthophotos.
 
-**PalmSensus AI** solves this with an enterprise-grade, memory-efficient **Tiled Computer Vision Engine** paired with a responsive **Interactive Web Dashboard**:
+**PalmSentinel AI Pro** delivers an industrial, memory-efficient **Tiled Computer Vision Engine** paired with a Photoshop-caliber **Interactive Desktop & Web Interface**:
 
-* **Handles Ultra-Large Orthomosaics**: Built to process 100MP+ stitched aerial images (e.g. 15,000 × 9,200 px) smoothly without memory leaks.
-* **Interactive Area (ROI) Selection**: Draw custom **Polygons** or **Bounding Boxes** around specific plantation blocks (*Blok TM, Blok TBM, Afdeling*).
-* **Real-Time Sliders**: Instantly calibrate crown diameter, tree spacing, and vegetation sensitivity for your drone's flight altitude.
-* **Point-and-Click Marker Editing**: Operators can click anywhere to add a missed palm or click an existing marker to delete a false positive.
-* **Estate Agronomy Metrics**: Automatically calculates **Stand Per Hectare (SPH / Kerapatan Pokok)**, Hectarage, and compares against Indonesian palm oil industry standards (136–143 SPH).
-* **Multi-Format Export**: Download high-resolution annotated maps, CSV coordinates for field GPS teams, and GeoJSON for QGIS/ArcGIS.
-
----
-
-## 🏛️ System Architecture
-
-```mermaid
-flowchart TD
-    A["Drone RGB Orthophoto\n(100MP+ Orthomosaic)"] --> B["PalmSensus Tiled Engine"]
-    
-    subgraph Engine ["Core Agri-Vision Pipeline"]
-        B --> C["1. Vegetation Indexing\n(ExG = 2G - R - B)"]
-        C --> D["2. Multi-Scale Smoothing\n(Crown Apex Consolidation)"]
-        D --> E["3. Morphological Dilation Peak Isolation\n(Apical Spear Leaf / Pucuk)"]
-        E --> F["4. Spatial Non-Maximum Suppression\n(Physical Tree Spacing Constraint)"]
-        F --> G["5. Polygon ROI Masking & Deduplication"]
-    end
-
-    subgraph UI ["Interactive Dashboard & Exports"]
-        G --> H["Live Canvas Viewport\n(Pan, Zoom, Polygon Draw)"]
-        G --> I["Analytics Card\n(Total Palms, Ha, SPH, Status)"]
-        G --> J["Export Suite\n(CSV, GeoJSON, Annotated Image)"]
-    end
-```
+* **Handles 100MP+ Orthomosaics**: Built to process 15,000 × 10,000+ px aerial maps smoothly without memory spikes or slowdowns.
+* **Photoshop-Style Canvas Navigation**:
+  * **Temporary Spacebar Pan**: Hold `Spacebar` anytime to pan across the estate without interrupting active polygon selections.
+  * **Draggable Anchor Point Editing**: Click and drag any polygon dot to adjust boundaries on the fly without resetting.
+  * **Alt + Click to Delete Point**: Instantly remove specific polygon points with Photoshop Pen Tool ergonomics.
+  * **Real-Time Edge Measurements**: Ground distances (in meters) are dynamically rendered along every polygon edge based on sensor GSD.
+  * **Precision Wheel & Pinch Zoom**: Snappy focal zoom anchored directly to the mouse cursor up to 35× (3,500%) magnification.
+  * **Movable & Collapsible Sensus Summary Box**: Drag the summary card anywhere on screen with 0-offset cursor precision, or minimize it with one click.
+* **Dual Operation Modes**:
+  * **Simple Mode**: Intuitive tree size slider (`Young TBM <———> Mature TM`) with **1-Click Tree Calibrator** ("🎯 Click to Sample a Tree").
+  * **Advanced Mode**: Fine-grained controls for agronomists (Blur $K_{size}$, Minimum Spacing, ExG Threshold, Ground Sampling Distance).
+* **Live 1-Tree Loupe Inspection**: Real-time 100% native resolution magnifier showing how single palms respond to calibration parameters.
+* **Dynamic High-Res Viewport Engine**: Streams razor-sharp 100% native pixels dynamically when zoomed into any canopy pocket.
+* **Titik Sisipan / Replanting Gap Spotter**: Detects missing grid intersections to estimate palm mortality rate.
+* **Estate Agronomy Analytics**: Automatic calculation of **Stand Density (SPH / Pokok per Hektar)**, Hectarage, and comparison against benchmark industrial targets (136–143 SPH).
+* **Multi-Format GIS Exports**: Instant CSV coordinates for handheld GPS crews, OGC GeoJSON for QGIS/ArcGIS, and annotated high-resolution maps.
 
 ---
 
-## 🚀 Quickstart Guide
+## 🚀 Quickstart & Launch Options
 
-### 1. Prerequisites & Installation
+### Option A: Standalone Windows App (No Browser Required)
+If using the compiled Windows distribution:
+Simply double-click:
+👉 **`PalmSentinel.exe`**
 
-Clone the repository and install the lightweight dependencies:
+* Launches as a dedicated desktop application window powered by WebView2.
+* Zero browser tabs, zero host URL distractions, and zero terminal clutter.
+
+---
+
+### Option B: Clone & Run via Python
 
 ```bash
-git clone https://github.com/your-username/palm-sensus-ai.git
-cd palm-sensus-ai
+# 1. Clone the repository
+git clone https://github.com/Zurplox/PalmSentinel-AI.git
+cd PalmSentinel-AI
 
+# 2. Install lightweight dependencies
 pip install -r requirements.txt
-```
 
-### 2. Launch the Web Dashboard
+# 3. Launch the application
+# Run as standalone desktop window:
+python desktop_app.py
 
-```bash
+# OR run as web server:
 python app.py
 ```
+When running `app.py`, open your browser at `http://127.0.0.1:5000`.
 
-Open your web browser and navigate to:
-```
-http://127.0.0.1:5000
-```
+> [!TIP]
+> A sample high-resolution estate patch is included in `data/demo_palm_estate.jpg` so the app works instantly out-of-the-box upon cloning!
 
-### 3. Run Automated CLI Batch Sensus
+---
 
-For automated workflows or scripting across multiple flights:
+## 📸 Loading Your Own Drone Orthophotos
+
+PalmSentinel AI includes a complete photo ingestion suite accessible right from the top navigation bar:
+1. **Dropdown Selector**: Switch instantly between orthophotos stored in `data/`.
+2. **📁 Browse / Upload**: Select any `.jpg`, `.png`, `.tif`, or `.tiff` from your computer.
+3. **📍 Paste Local Path**: Paste any absolute file path on your drive.
+4. **Drag & Drop**: Drag an orthophoto directly from Windows Explorer and drop it anywhere onto the canvas!
+
+---
+
+## ⌨️ Keyboard & Mouse Shortcuts
+
+| Key / Action | Function |
+| :--- | :--- |
+| **`Spacebar` (Hold)** | Temporary Pan (Photoshop-style): click & drag to move around without losing your active tool |
+| **`Mouse Wheel`** | Focal Zoom anchored to cursor position |
+| **`Double-Click`** | Instant 1.6× zoom straight into target point (or close in-progress polygon) |
+| **`Ctrl + Z` / `Backspace`** | Undo last placed polygon point (step backward 1 point) |
+| **`Escape` (Esc)** | Reset polygon selection or cancel active tool |
+| **`Alt + Click` on Vertex** | Delete that specific polygon anchor point |
+| **`Click & Drag` Vertex** | Move/adjust an existing anchor point with real-time recalculation of SPH and Ha |
+| **`Right-Click Drag`** | Alternative pan shortcut |
+
+---
+
+## 🌿 Agronomic Calibration Benchmarks
+
+| Parameter | Mature Palm (*TM*) | Young Palm (*TBM*) | Agronomic Purpose |
+| :--- | :--- | :--- | :--- |
+| **Crown Blur Radius** | `29 – 35 px` | `17 – 23 px` | Consolidates frond rosette geometry into an apical spear peak (*pucuk*). |
+| **Min Tree Spacing** | `65 – 80 px` | `42 – 52 px` | Prevents interlocking fronds from causing duplicate detections. |
+| **Vegetation Threshold (ExG)** | `72 – 78` | `68 – 74` | Masks bare peat soil, drainage trenches (*parit cacing*), and roads. |
+| **Industry Target SPH** | `136 – 143 SPH` | `143 – 160 SPH` | Standard triangular planting grid ($9.0\text{m} \times 7.8\text{m}$ to $9.2\text{m} \times 8.0\text{m}$). |
+
+---
+
+## 🧪 Comprehensive Automated System Audit
+
+Run the built-in 42-point system verification suite:
 
 ```bash
-# Count mature plantation block
-python cli.py --image "path/to/orthophoto.jpg" --preset mature --gsd 4.0 --output results/
-
-# Count young plantation with custom bounding box
-python cli.py --image "path/to/orthophoto.jpg" --preset young --bbox 500 10000 3500 14500 --output results/
+python audit_suite.py
 ```
+
+Tests filesystem assets, computer vision indices (ExG, VARI, GLI), peak dilation, spatial grid hashing NMS, Shoelace agronomic math, API latency, memory safety, and executable launcher integrity.
 
 ---
 
-## 🌿 Agronomic Calibration Guide
-
-| Parameter | Mature Palm (TM) | Young Palm (TBM) | Purpose & Agronomic Context |
-| :--- | :--- | :--- | :--- |
-| **Crown Blur Radius** | `29 – 35 px` | `17 – 23 px` | Consolidates frond rosette geometry into a distinct apical spear peak (*pucuk*). |
-| **Min Tree Spacing** | `65 – 80 px` | `42 – 52 px` | Prevents long interlocking fronds on the same palm from being double counted. |
-| **Vegetation Sensitivity (ExG)** | `72 – 78` | `68 – 74` | Eliminates bare peat soil, water trenches (*parit*), collection roads, and shadows. |
-| **Industry Target SPH** | `136 – 143 SPH` | `143 – 160 SPH` | Standard triangular equilateral grid ($9.0\text{m} \times 7.8\text{m}$ or $9.2\text{m} \times 8.0\text{m}$). |
-
----
-
-## 📂 Project Structure
+## 📂 Repository Structure
 
 ```
-palm-sensus-ai/
-├── engine/                     # Core computer vision engine
-│   ├── __init__.py
+PalmSentinel-AI/
+├── PalmSentinel.exe            # Native Windows C# compiled launcher
+├── desktop_app.py              # Standalone desktop window runner (WebView2)
+├── app.py                      # Flask REST API & high-res image pipeline
+├── Launcher.cs                 # C# source code for native launcher
+├── audit_suite.py              # 42-point automated enterprise test suite
+├── cli.py                      # Terminal CLI batch counting tool
+├── run_full_sensus.py          # Multi-block automated estate audit script
+├── engine/                     # Computer vision & agronomy algorithms
 │   ├── detector.py             # ExG, peak dilation, and spatial NMS
-│   ├── tiler.py                # 100MP+ tiled chunk processing
+│   ├── tiler.py                # 100MP+ tiled chunk processing manager
 │   └── roi_utils.py            # Shoelace polygon area, SPH, and masking
 ├── templates/
-│   └── index.html              # Modern responsive dark-mode dashboard
+│   └── index.html              # Dark-mode dashboard template
 ├── static/
-│   ├── app.js                  # Canvas pan/zoom, polygon draw, marker editor
-│   └── style.css               # Styling & layout definitions
-├── tests/
-│   └── test_detector.py        # Automated unit & regression tests
-├── cli.py                      # Terminal CLI batch processing tool
-├── run_full_sensus.py          # Dedicated multi-block estate audit script
-├── requirements.txt            # Python package dependencies
-├── .gitignore                  # Git ignore rules
-└── README.md                   # Enterprise documentation
-```
-
----
-
-## 📊 Export Formats
-
-1. **CSV Coordinates (`.csv`)**:
-   `id, block_name, x_full, y_full, x_overview, y_overview, confidence, crown_radius_px`
-   Ready for import into handheld GPS, Microsoft Excel, or Google Earth.
-2. **GeoJSON (`.geojson`)**:
-   Standard OGC FeatureCollection with Point features containing tree IDs and confidence metadata for GIS tools (**QGIS**, **ArcGIS**).
-3. **High-Resolution Annotated Map (`.jpg` / `.png`)**:
-   Full-resolution crop of the active block with numbered markers and crown circles.
-
----
-
-## 🧪 Testing
-
-Run the automated test suite:
-
-```bash
-python -m unittest discover -s tests
+│   ├── app.js                  # Canvas engine, Photoshop tools, event controller
+│   └── style.css               # User interface styling
+├── data/                       # Orthophoto storage directory
+│   └── demo_palm_estate.jpg    # Bundled sample orthophoto
+├── requirements.txt            # Python dependencies
+└── README.md                   # Project documentation
 ```
 
 ---
 
 ## 📄 License
-Developed for commercial agricultural drone surveying and estate management.
+Developed for commercial agricultural drone surveying, plantation census auditing, and precision estate management.

@@ -1,0 +1,45 @@
+name: PalmSentinel AI CI Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    name: Agri-Vision Engine & Math Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Unit Tests
+        run: |
+          python -m unittest discover -s tests -v
+
+      - name: Verify Core Engine Import & Math Integrity
+        run: |
+          python -c "
+          import cv2, numpy as np
+          from engine.detector import PalmDetector
+          from engine.roi_utils import calculate_polygon_area, calculate_sph
+          d = PalmDetector('mature')
+          print('PalmDetector initialized successfully:', d.preset.name)
+          area = calculate_polygon_area([[0,0], [1000,0], [1000,1000], [0,1000]], gsd_cm=4.0)
+          print(f'Test polygon area: {area[\"area_hectares\"]:.4f} Ha')
+          sph = calculate_sph(136, area[\"area_hectares\"])
+          print(f'Calculated SPH: {sph[\"sph\"]} ({sph[\"status\"]})')
+          "
