@@ -394,6 +394,7 @@ def export_annotated_image():
     data = request.json or {}
     palms = data.get("palms", [])
     raw_polygon = data.get("polygon", [])
+    block_name = data.get("block_name", "Blok-Utama").strip() or "Blok-Utama"
     scale = CACHE["scale_factor"]
 
     if CACHE["full_image"] is None:
@@ -623,14 +624,18 @@ def export_estate_report():
             <tbody>
         """
         for i, b in enumerate(saved_blocks, 1):
+            b_area = float(b.get('area_ha', b.get('areaHa', 0.0)))
+            b_palms = int(b.get('total_palms', b.get('palmCount', b.get('palms', 0))))
+            b_sph = float(b.get('sph', 0.0))
+            b_status = b.get('sphStatus', b.get('status', 'Audited'))
             report_html += f"""
                 <tr class="border-b border-slate-100 hover:bg-slate-50">
                     <td class="py-2 px-3 font-mono">{i}</td>
                     <td class="py-2 px-3 font-bold text-slate-800">{b.get('name', f'Block {i}')}</td>
-                    <td class="py-2 px-3 text-right font-mono">{float(b.get('areaHa', 0)):.2f} Ha</td>
-                    <td class="py-2 px-3 text-right font-mono font-bold text-emerald-700">{int(b.get('palmCount', 0)):,}</td>
-                    <td class="py-2 px-3 text-right font-mono">{float(b.get('sph', 0)):.0f}</td>
-                    <td class="py-2 px-3 text-slate-600">{b.get('status', 'Audited')}</td>
+                    <td class="py-2 px-3 text-right font-mono">{b_area:.2f} Ha</td>
+                    <td class="py-2 px-3 text-right font-mono font-bold text-emerald-700">{b_palms:,}</td>
+                    <td class="py-2 px-3 text-right font-mono">{b_sph:.0f}</td>
+                    <td class="py-2 px-3 text-slate-600">{b_status}</td>
                 </tr>
             """
         report_html += """

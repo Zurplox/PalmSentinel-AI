@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import json
+import re
 import tracemalloc
 import unittest
 import numpy as np
@@ -101,6 +102,19 @@ class PalmSentinelAuditor:
             size = os.path.getsize(rel_path) if exists else 0
             size_str = f"{round(size / 1024, 1)} KB" if size < 1024*1024 else f"{round(size / (1024*1024), 2)} MB"
             self.log_result("FileSystem", f"{desc} ({rel_path})", exists, f"Size: {size_str}")
+
+        # DOM Element Integrity Check (app.js vs index.html)
+        try:
+            with open('static/app.js', 'r', encoding='utf-8') as f:
+                js_content = f.read()
+            with open('templates/index.html', 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            js_ids = set(re.findall(r"getElementById\(['\"]([^'\"]+)['\"]", js_content))
+            html_ids = set(re.findall(r'id=["\']([^"\']+)["\']', html_content))
+            missing_dom = js_ids - html_ids
+            self.log_result("FileSystem", f"DOM UI Elements Integrity ({len(js_ids)} elements)", len(missing_dom) == 0, f"Missing: {len(missing_dom)}")
+        except Exception as e:
+            self.log_result("FileSystem", "DOM UI Elements Integrity", False, str(e))
 
     # 2. Vision Engine Core Audit
     def audit_engine_core(self):
@@ -276,7 +290,17 @@ class PalmSentinelAuditor:
             report_ok = (r.status_code == 200 and b"Kebun Sawit Audit Test" in r.data and b"Canopy Health Distribution" in r.data)
             self.log_result("API", "POST /api/export-report (Printable / PDF Executive Audit)", report_ok, f"Size: {len(r.data)} bytes", (time.time()-t0)*1000)
 
-            # 13. Edge Case: Malformed or Out-of-bounds Viewport Patch
+            # 13. POST /api/export-annotated-image (JPEG Orthophoto Crop with Palm Circles)
+            t0 = time.time()
+            r = client.post('/api/export-annotated-image', json={
+                'palms': [{'id': 1, 'x': 100, 'y': 100, 'full_x': 500, 'full_y': 500, 'confidence': 0.98, 'radius': 28}],
+                'polygon': [[400, 400], [600, 400], [600, 600], [400, 600]],
+                'block_name': 'Blok-Audit-Annotated'
+            })
+            annotated_ok = (r.status_code == 200 and len(r.data) > 500 and r.mimetype == "image/jpeg")
+            self.log_result("API", "POST /api/export-annotated-image (Annotated JPEG Export)", annotated_ok, f"Size: {len(r.data)} bytes", (time.time()-t0)*1000)
+
+            # 14. Edge Case: Malformed or Out-of-bounds Viewport Patch
             t0 = time.time()
             r = client.get('/api/viewport-patch?x1=5000&y1=5000&x2=3000&y2=3000') # inverted coords
             edge_ok = (r.status_code in [400, 500]) # should gracefully reject

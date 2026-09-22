@@ -1809,9 +1809,10 @@ function saveCurrentBlock() {
     const areaHa = parseFloat(statArea.textContent) || 0.0;
     const sphVal = parseFloat(statSph.textContent) || 0.0;
 
-    const blockIndex = state.savedBlocks.length;
-    const newBlock = {
-        id: "block_" + Date.now(),
+    const existingIndex = state.savedBlocks.findIndex(b => b.name.toLowerCase() === blockName.toLowerCase());
+    const blockIndex = existingIndex >= 0 ? existingIndex : state.savedBlocks.length;
+    const blockData = {
+        id: existingIndex >= 0 ? state.savedBlocks[existingIndex].id : "block_" + Date.now(),
         name: blockName,
         polygon: JSON.parse(JSON.stringify(state.polygon)),
         palms: JSON.parse(JSON.stringify(state.palms)),
@@ -1823,7 +1824,11 @@ function saveCurrentBlock() {
         color: BLOCK_PALETTE[blockIndex % BLOCK_PALETTE.length]
     };
 
-    state.savedBlocks.push(newBlock);
+    if (existingIndex >= 0) {
+        state.savedBlocks[existingIndex] = blockData;
+    } else {
+        state.savedBlocks.push(blockData);
+    }
     updateSavedBlocksUI();
 
     // Prepare workspace for next block selection
@@ -1934,23 +1939,37 @@ function restoreBlock(index) {
 
 // Export Handlers
 async function exportReport() {
-    const block = (inputBlockName.value || "Blok-Utama").trim();
-    const areaHa = parseFloat(statArea.textContent) || 0.0;
-    const sph = parseFloat(statSph.textContent) || 0.0;
-    const sphStatus = statStatus.textContent || "N/A";
+    let block = (inputBlockName.value || "Blok-Utama").trim();
+    let totalPalms = state.palms.length;
+    let areaHa = parseFloat(statArea.textContent) || 0.0;
+    let sph = parseFloat(statSph.textContent) || 0.0;
+    let sphStatus = statStatus.textContent || "N/A";
     const gapsCount = state.gaps ? state.gaps.length : 0;
     const mortalityPct = parseFloat(statMortality ? statMortality.textContent : 0) || 0.0;
     const gsdCm = sliderGsd ? parseFloat(sliderGsd.value) : 4.0;
 
+    // If active polygon is empty but user saved blocks, aggregate across the whole estate!
+    if (totalPalms === 0 && state.savedBlocks.length > 0) {
+        block = `Seluruh Estate (${state.savedBlocks.length} Blok)`;
+        state.savedBlocks.forEach(b => {
+            totalPalms += (b.palms ? b.palms.length : 0);
+            areaHa += (b.areaHa || 0);
+        });
+        if (areaHa > 0) {
+            sph = Math.round(totalPalms / areaHa);
+            sphStatus = sph >= 130 && sph <= 150 ? "Optimal Estate Standard" : (sph < 130 ? "Under-Target Density" : "High Density Stand");
+        }
+    }
+
     const payload = {
         estate_name: "Perkebunan Kelapa Sawit",
         block_name: block,
-        total_palms: state.palms.length,
+        total_palms: totalPalms,
         area_ha: areaHa,
         sph: sph,
         sph_status: sphStatus,
         health_summary: state.healthSummary || {
-            healthy_count: state.palms.length,
+            healthy_count: totalPalms,
             healthy_pct: 100,
             stressed_count: 0,
             stressed_pct: 0,
@@ -1963,8 +1982,11 @@ async function exportReport() {
         saved_blocks: state.savedBlocks.map(b => ({
             name: b.name,
             total_palms: b.palms ? b.palms.length : 0,
+            palmCount: b.palms ? b.palms.length : 0,
             area_ha: b.areaHa || 0,
-            sph: b.sph || 0
+            areaHa: b.areaHa || 0,
+            sph: b.sph || 0,
+            status: b.sphStatus || "Audited"
         }))
     };
 
