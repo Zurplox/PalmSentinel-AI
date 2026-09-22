@@ -174,6 +174,17 @@ class PalmDetector:
         estimated_crown_radius = max(15, int(min_dist * 0.45))
 
         for idx, (lx, ly, score) in enumerate(accepted_local, 1):
+            # Crown health grading based on photosynthetic foliage density
+            if score >= 82:
+                health_status = "healthy"
+                health_label = "Optimal Green"
+            elif score >= 66:
+                health_status = "stressed"
+                health_label = "Mild Chlorosis"
+            else:
+                health_status = "critical"
+                health_label = "Defoliated / Stunted"
+
             detected_palms.append({
                 "id": idx,
                 "x": int(lx + offset_x),
@@ -182,7 +193,9 @@ class PalmDetector:
                 "local_y": int(ly),
                 "radius": estimated_crown_radius,
                 "confidence": round(min(1.0, score / 255.0), 3),
-                "peak_intensity": int(score)
+                "peak_intensity": int(score),
+                "health_status": health_status,
+                "health_label": health_label
             })
 
         return detected_palms

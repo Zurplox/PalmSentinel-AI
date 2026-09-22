@@ -51,6 +51,9 @@ const state = {
     gaps: [],
     showMissingPalms: false,
     showDensityHeatmap: false,
+    showHealthColors: true,
+    healthSummary: null,
+    savedBlocks: [],
     
     // UI Options
     showNumbers: true,
@@ -143,6 +146,22 @@ const inputCustomPath = document.getElementById('input-custom-path');
 const btnLoadPath = document.getElementById('btn-load-path');
 const btnTopUpload = document.getElementById('btn-top-upload');
 const dropzoneOverlay = document.getElementById('dropzone-overlay');
+
+// Health, Multi-Block, and Minimap Elements
+const chkHealthColors = document.getElementById('chk-health-colors');
+const btnSaveBlock = document.getElementById('btn-save-block');
+const badgeSavedBlocksCount = document.getElementById('badge-saved-blocks-count');
+const savedBlocksContainer = document.getElementById('saved-blocks-container');
+const savedBlocksList = document.getElementById('saved-blocks-list');
+const btnExportReport = document.getElementById('btn-export-report');
+const statHealthCard = document.getElementById('stat-health-card');
+const statHealthTotal = document.getElementById('stat-health-total');
+const statHealthGreen = document.getElementById('stat-health-green');
+const statHealthYellow = document.getElementById('stat-health-yellow');
+const statHealthRed = document.getElementById('stat-health-red');
+const minimapCanvas = document.getElementById('minimap-canvas');
+const minimapWrapper = document.getElementById('minimap-wrapper');
+const minimapViewfinder = document.getElementById('minimap-viewfinder');
 
 // Initialize
 async function initApp() {
@@ -432,6 +451,14 @@ function updateSimpleSizeLabel(r) {
     }
 }
 
+const BLOCK_PALETTE = [
+    { fill: "rgba(59, 130, 246, 0.22)", stroke: "#3b82f6" }, // Blue
+    { fill: "rgba(168, 85, 247, 0.22)", stroke: "#a855f7" }, // Purple
+    { fill: "rgba(249, 115, 22, 0.22)", stroke: "#f97316" }, // Orange
+    { fill: "rgba(236, 72, 153, 0.22)", stroke: "#ec4899" }, // Pink
+    { fill: "rgba(20, 184, 166, 0.22)", stroke: "#14b8a6" }  // Teal
+];
+
 // -------------------------------------------------------------
 // MAIN CANVAS RENDER LOOP
 // -------------------------------------------------------------
@@ -461,6 +488,49 @@ function render() {
         const pw = (state.patchBBox.x2 - state.patchBBox.x1) / scale;
         const ph = (state.patchBBox.y2 - state.patchBBox.y1) / scale;
         ctx.drawImage(state.patchImg, px, py, pw, ph);
+    }
+
+    // 2.5 Draw Saved Estate Blocks (Multi-Block Session)
+    if (state.savedBlocks && state.savedBlocks.length > 0) {
+        for (let bIndex = 0; bIndex < state.savedBlocks.length; bIndex++) {
+            const b = state.savedBlocks[bIndex];
+            if (!b.polygon || b.polygon.length < 3) continue;
+
+            const color = b.color || BLOCK_PALETTE[bIndex % BLOCK_PALETTE.length];
+            ctx.beginPath();
+            ctx.moveTo(b.polygon[0].x, b.polygon[0].y);
+            for (let i = 1; i < b.polygon.length; i++) {
+                ctx.lineTo(b.polygon[i].x, b.polygon[i].y);
+            }
+            ctx.closePath();
+            ctx.fillStyle = color.fill;
+            ctx.fill();
+            ctx.strokeStyle = color.stroke;
+            ctx.lineWidth = 2.0 / state.zoom;
+            ctx.setLineDash([6 / state.zoom, 4 / state.zoom]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Block Label Badge at centroid
+            let cx = 0, cy = 0;
+            b.polygon.forEach(pt => { cx += pt.x; cy += pt.y; });
+            cx /= b.polygon.length;
+            cy /= b.polygon.length;
+
+            const badgeText = `${b.name} (${b.palms ? b.palms.length : 0}p)`;
+            ctx.font = `bold ${Math.max(10, Math.round(12 / state.zoom))}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const tw = ctx.measureText(badgeText).width + (8 / state.zoom);
+            const th = 16 / state.zoom;
+            ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
+            ctx.fillRect(cx - tw / 2, cy - th / 2, tw, th);
+            ctx.strokeStyle = color.stroke;
+            ctx.lineWidth = 1.2 / state.zoom;
+            ctx.strokeRect(cx - tw / 2, cy - th / 2, tw, th);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillText(badgeText, cx, cy);
+        }
     }
 
     // 3. Draw Polygon ROI (if exists)
@@ -615,11 +685,27 @@ function render() {
             const p = state.palms[i];
             const r = (p.radius || 4);
 
+            // Health Chlorosis Color Grading
+            let crownColor = "#22c55e"; // Healthy emerald
+            let apexColor = "#ef4444";  // Red spear leaf center
+            if (state.showHealthColors && p.health_status) {
+                if (p.health_status === "critical") {
+                    crownColor = "#ef4444"; // Red for defoliated / severely chlorotic
+                    apexColor = "#b91c1c";
+                } else if (p.health_status === "stressed") {
+                    crownColor = "#f59e0b"; // Amber/yellow for stressed / yellowing
+                    apexColor = "#d97706";
+                } else {
+                    crownColor = "#22c55e"; // Optimal vigorous green
+                    apexColor = "#15803d";
+                }
+            }
+
             // Outer Crown Circle
             if (state.showCircles) {
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-                ctx.strokeStyle = "#22c55e";
+                ctx.strokeStyle = crownColor;
                 ctx.lineWidth = 1.8 / state.zoom;
                 ctx.stroke();
             }
@@ -627,7 +713,7 @@ function render() {
             // Apical Bud Center Point (Spear leaf)
             ctx.beginPath();
             ctx.arc(p.x, p.y, 2.5 / state.zoom, 0, Math.PI * 2);
-            ctx.fillStyle = "#ef4444";
+            ctx.fillStyle = apexColor;
             ctx.fill();
 
             // Tree Sequential Number
@@ -678,6 +764,95 @@ function render() {
     }
 
     ctx.restore();
+
+    // 9. Update Picture-in-Picture Radar Minimap
+    renderMinimap();
+}
+
+// -------------------------------------------------------------
+// RADAR MINIMAP RENDERING & NAVIGATION
+// -------------------------------------------------------------
+function renderMinimap() {
+    if (!minimapCanvas || !state.imageLoaded || !state.image) return;
+    const mctx = minimapCanvas.getContext('2d');
+    const mw = minimapCanvas.width;
+    const mh = minimapCanvas.height;
+
+    mctx.clearRect(0, 0, mw, mh);
+
+    const imgW = state.image.width || 1;
+    const imgH = state.image.height || 1;
+
+    // Draw overview orthophoto
+    mctx.drawImage(state.image, 0, 0, mw, mh);
+
+    // Draw saved blocks on minimap
+    if (state.savedBlocks && state.savedBlocks.length > 0) {
+        state.savedBlocks.forEach(b => {
+            if (b.polygon && b.polygon.length >= 3) {
+                mctx.beginPath();
+                mctx.moveTo((b.polygon[0].x / imgW) * mw, (b.polygon[0].y / imgH) * mh);
+                for (let i = 1; i < b.polygon.length; i++) {
+                    mctx.lineTo((b.polygon[i].x / imgW) * mw, (b.polygon[i].y / imgH) * mh);
+                }
+                mctx.closePath();
+                mctx.fillStyle = b.color ? b.color.fill : "rgba(59, 130, 246, 0.4)";
+                mctx.fill();
+                mctx.strokeStyle = b.color ? b.color.stroke : "#3b82f6";
+                mctx.lineWidth = 1;
+                mctx.stroke();
+            }
+        });
+    }
+
+    // Draw active ROI polygon on minimap
+    if (state.polygon && state.polygon.length >= 3) {
+        mctx.beginPath();
+        mctx.moveTo((state.polygon[0].x / imgW) * mw, (state.polygon[0].y / imgH) * mh);
+        for (let i = 1; i < state.polygon.length; i++) {
+            mctx.lineTo((state.polygon[i].x / imgW) * mw, (state.polygon[i].y / imgH) * mh);
+        }
+        mctx.closePath();
+        mctx.fillStyle = "rgba(16, 185, 129, 0.45)";
+        mctx.fill();
+        mctx.strokeStyle = "#10b981";
+        mctx.lineWidth = 1.2;
+        mctx.stroke();
+    }
+
+    // Position and size the interactive viewfinder rectangle
+    if (minimapViewfinder) {
+        const minX = -state.panX / state.zoom;
+        const minY = -state.panY / state.zoom;
+        const maxX = (canvas.width - state.panX) / state.zoom;
+        const maxY = (canvas.height - state.panY) / state.zoom;
+
+        const vx = Math.max(0, Math.min(mw - 6, (minX / imgW) * mw));
+        const vy = Math.max(0, Math.min(mh - 6, (minY / imgH) * mh));
+        const vw = Math.max(8, Math.min(mw - vx, ((maxX - minX) / imgW) * mw));
+        const vh = Math.max(8, Math.min(mh - vy, ((maxY - minY) / imgH) * mh));
+
+        minimapViewfinder.style.left = `${vx}px`;
+        minimapViewfinder.style.top = `${vy}px`;
+        minimapViewfinder.style.width = `${vw}px`;
+        minimapViewfinder.style.height = `${vh}px`;
+    }
+}
+
+function handleMinimapInteraction(e) {
+    if (!minimapWrapper || !state.imageLoaded || !state.image) return;
+    const rect = minimapWrapper.getBoundingClientRect();
+    const mx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const my = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+
+    const targetImgX = mx * state.image.width;
+    const targetImgY = my * state.image.height;
+
+    state.panX = canvas.width / 2 - targetImgX * state.zoom;
+    state.panY = canvas.height / 2 - targetImgY * state.zoom;
+
+    scheduleViewportPatch();
+    render();
 }
 
 // -------------------------------------------------------------
@@ -833,6 +1008,13 @@ function setupEventListeners() {
         render();
     });
 
+    if (chkHealthColors) {
+        chkHealthColors.addEventListener('change', () => {
+            state.showHealthColors = chkHealthColors.checked;
+            render();
+        });
+    }
+
     chkShowNumbers.addEventListener('change', () => { state.showNumbers = chkShowNumbers.checked; render(); });
     chkShowCircles.addEventListener('change', () => { state.showCircles = chkShowCircles.checked; render(); });
 
@@ -844,6 +1026,7 @@ function setupEventListeners() {
             resetPolygon(true);
         });
     }
+    if (btnSaveBlock) btnSaveBlock.addEventListener('click', saveCurrentBlock);
 
     if (btnFitScreen) btnFitScreen.addEventListener('click', fitToScreen);
     if (btnNativeRes) {
@@ -870,6 +1053,22 @@ function setupEventListeners() {
     if (btnGeo) btnGeo.addEventListener('click', exportGeojson);
     const btnImg = document.getElementById('btn-export-img');
     if (btnImg) btnImg.addEventListener('click', exportAnnotatedImage);
+    if (btnExportReport) btnExportReport.addEventListener('click', exportReport);
+
+    // Radar Minimap Viewport Drag / Click Interaction
+    if (minimapWrapper) {
+        let isMinimapActive = false;
+        minimapWrapper.addEventListener('mousedown', (e) => {
+            isMinimapActive = true;
+            handleMinimapInteraction(e);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (isMinimapActive) handleMinimapInteraction(e);
+        });
+        window.addEventListener('mouseup', () => {
+            isMinimapActive = false;
+        });
+    }
 
     // Prevent default context menu on canvas & container so right-click pan works cleanly
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1495,11 +1694,19 @@ async function runCount() {
 
         if (data.success) {
             state.palms = data.palms;
+            state.healthSummary = data.health_summary || null;
             statPalms.textContent = data.total_count.toLocaleString();
             statArea.textContent = data.area_info.area_hectares.toFixed(2);
             statSph.textContent = `${data.sph_info.sph} SPH`;
             statStatus.textContent = data.sph_info.status;
             statTime.textContent = `${data.process_time_s}s`;
+
+            if (state.healthSummary && statHealthCard) {
+                statHealthCard.classList.remove('hidden');
+                if (statHealthGreen) statHealthGreen.textContent = `${state.healthSummary.healthy_count} (${state.healthSummary.healthy_pct}%)`;
+                if (statHealthYellow) statHealthYellow.textContent = `${state.healthSummary.stressed_count} (${state.healthSummary.stressed_pct}%)`;
+                if (statHealthRed) statHealthRed.textContent = `${state.healthSummary.critical_count} (${state.healthSummary.critical_pct}%)`;
+            }
 
             if (state.showMissingPalms) {
                 fetchGaps();
@@ -1583,12 +1790,205 @@ function resetStats() {
     statStatus.textContent = "Draw an area and click 'Run Palm Sensus Count'.";
     statTime.textContent = "0.0s";
     statGapsCard.classList.add('hidden');
+    if (statHealthCard) statHealthCard.classList.add('hidden');
+    state.healthSummary = null;
     if (analyticsMiniBadge) {
         analyticsMiniBadge.textContent = "0 palms";
     }
 }
 
+// -------------------------------------------------------------
+// MULTI-BLOCK ESTATE SESSION MANAGER
+// -------------------------------------------------------------
+function saveCurrentBlock() {
+    if (state.polygon.length < 3 && state.palms.length === 0) {
+        alert("Draw a polygon or run a sensus count first before saving this block.");
+        return;
+    }
+    const blockName = (inputBlockName.value || `Blok ${state.savedBlocks.length + 1}`).trim();
+    const areaHa = parseFloat(statArea.textContent) || 0.0;
+    const sphVal = parseFloat(statSph.textContent) || 0.0;
+
+    const blockIndex = state.savedBlocks.length;
+    const newBlock = {
+        id: "block_" + Date.now(),
+        name: blockName,
+        polygon: JSON.parse(JSON.stringify(state.polygon)),
+        palms: JSON.parse(JSON.stringify(state.palms)),
+        gaps: JSON.parse(JSON.stringify(state.gaps)),
+        areaHa: areaHa,
+        sph: sphVal,
+        sphStatus: statStatus.textContent,
+        healthSummary: state.healthSummary ? JSON.parse(JSON.stringify(state.healthSummary)) : null,
+        color: BLOCK_PALETTE[blockIndex % BLOCK_PALETTE.length]
+    };
+
+    state.savedBlocks.push(newBlock);
+    updateSavedBlocksUI();
+
+    // Prepare workspace for next block selection
+    state.polygon = [];
+    state.palms = [];
+    state.gaps = [];
+    resetStats();
+    inputBlockName.value = `Blok ${state.savedBlocks.length + 1}`;
+    render();
+}
+
+function updateSavedBlocksUI() {
+    if (!savedBlocksContainer || !savedBlocksList || !badgeSavedBlocksCount) return;
+    badgeSavedBlocksCount.textContent = state.savedBlocks.length;
+
+    if (state.savedBlocks.length === 0) {
+        savedBlocksContainer.classList.add('hidden');
+        savedBlocksList.innerHTML = "";
+        return;
+    }
+
+    savedBlocksContainer.classList.remove('hidden');
+    savedBlocksList.innerHTML = "";
+
+    state.savedBlocks.forEach((b, idx) => {
+        const item = document.createElement('div');
+        item.className = "flex items-center justify-between bg-slate-900 px-2 py-1.5 rounded border border-slate-700/70 text-xs hover:border-slate-500 transition group";
+
+        const infoSpan = document.createElement('div');
+        infoSpan.className = "flex items-center gap-1.5 cursor-pointer flex-1 overflow-hidden";
+        infoSpan.title = "Click to zoom into and restore this block";
+
+        const dot = document.createElement('span');
+        dot.className = "w-2.5 h-2.5 rounded-full inline-block flex-shrink-0";
+        dot.style.backgroundColor = b.color ? b.color.stroke : "#10b981";
+
+        const text = document.createElement('span');
+        text.className = "truncate font-medium text-slate-200";
+        text.textContent = `${b.name} (${b.palms ? b.palms.length : 0}p | ${b.areaHa.toFixed(1)}Ha)`;
+
+        infoSpan.appendChild(dot);
+        infoSpan.appendChild(text);
+
+        infoSpan.addEventListener('click', () => {
+            restoreBlock(idx);
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.className = "text-slate-500 hover:text-rose-400 px-1 text-xs transition";
+        delBtn.title = "Delete this saved block";
+        delBtn.textContent = "✕";
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.savedBlocks.splice(idx, 1);
+            updateSavedBlocksUI();
+            render();
+        });
+
+        item.appendChild(infoSpan);
+        item.appendChild(delBtn);
+        savedBlocksList.appendChild(item);
+    });
+}
+
+function restoreBlock(index) {
+    const b = state.savedBlocks[index];
+    if (!b) return;
+
+    state.polygon = JSON.parse(JSON.stringify(b.polygon));
+    state.palms = JSON.parse(JSON.stringify(b.palms));
+    state.gaps = JSON.parse(JSON.stringify(b.gaps || []));
+    state.healthSummary = b.healthSummary ? JSON.parse(JSON.stringify(b.healthSummary)) : null;
+
+    inputBlockName.value = b.name;
+    statPalms.textContent = state.palms.length.toLocaleString();
+    statArea.textContent = b.areaHa.toFixed(2);
+    statSph.textContent = `${b.sph} SPH`;
+    statStatus.textContent = b.sphStatus || "Evaluated";
+
+    if (state.healthSummary && statHealthCard) {
+        statHealthCard.classList.remove('hidden');
+        if (statHealthGreen) statHealthGreen.textContent = `${state.healthSummary.healthy_count} (${state.healthSummary.healthy_pct}%)`;
+        if (statHealthYellow) statHealthYellow.textContent = `${state.healthSummary.stressed_count} (${state.healthSummary.stressed_pct}%)`;
+        if (statHealthRed) statHealthRed.textContent = `${state.healthSummary.critical_count} (${state.healthSummary.critical_pct}%)`;
+    }
+
+    // Zoom and center to this block
+    if (state.polygon.length >= 3) {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        state.polygon.forEach(pt => {
+            minX = Math.min(minX, pt.x);
+            maxX = Math.max(maxX, pt.x);
+            minY = Math.min(minY, pt.y);
+            maxY = Math.max(maxY, pt.y);
+        });
+        const bw = maxX - minX || 100;
+        const bh = maxY - minY || 100;
+        const pad = 1.3;
+        const z = Math.min(canvas.width / (bw * pad), canvas.height / (bh * pad), 2.5);
+        state.zoom = z;
+        state.panX = canvas.width / 2 - ((minX + maxX) / 2) * z;
+        state.panY = canvas.height / 2 - ((minY + maxY) / 2) * z;
+        updateZoomLabel();
+        scheduleViewportPatch();
+    }
+    render();
+}
+
 // Export Handlers
+async function exportReport() {
+    const block = (inputBlockName.value || "Blok-Utama").trim();
+    const areaHa = parseFloat(statArea.textContent) || 0.0;
+    const sph = parseFloat(statSph.textContent) || 0.0;
+    const sphStatus = statStatus.textContent || "N/A";
+    const gapsCount = state.gaps ? state.gaps.length : 0;
+    const mortalityPct = parseFloat(statMortality ? statMortality.textContent : 0) || 0.0;
+    const gsdCm = sliderGsd ? parseFloat(sliderGsd.value) : 4.0;
+
+    const payload = {
+        estate_name: "Perkebunan Kelapa Sawit",
+        block_name: block,
+        total_palms: state.palms.length,
+        area_ha: areaHa,
+        sph: sph,
+        sph_status: sphStatus,
+        health_summary: state.healthSummary || {
+            healthy_count: state.palms.length,
+            healthy_pct: 100,
+            stressed_count: 0,
+            stressed_pct: 0,
+            critical_count: 0,
+            critical_pct: 0
+        },
+        gaps_count: gapsCount,
+        mortality_pct: mortalityPct,
+        gsd_cm: gsdCm,
+        saved_blocks: state.savedBlocks.map(b => ({
+            name: b.name,
+            total_palms: b.palms ? b.palms.length : 0,
+            area_ha: b.areaHa || 0,
+            sph: b.sph || 0
+        }))
+    };
+
+    try {
+        const res = await fetch('/api/export-report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const html = await res.text();
+        const reportWindow = window.open('', '_blank');
+        if (reportWindow) {
+            reportWindow.document.open();
+            reportWindow.document.write(html);
+            reportWindow.document.close();
+        } else {
+            alert("Popup blocked! Please allow popups to view the printable report.");
+        }
+    } catch (err) {
+        console.error("Export report failed:", err);
+        alert("Failed to generate executive report: " + err.message);
+    }
+}
+
 async function exportCsv() {
     if (state.palms.length === 0) {
         alert("No palm detections to export. Run sensus count first!");

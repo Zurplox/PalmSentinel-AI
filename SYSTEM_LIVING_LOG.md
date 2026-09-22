@@ -376,29 +376,20 @@ If you are an AI assistant taking over this conversation:
 
 Here are the top high-value capabilities designed for future implementation:
 
-### Feature 1: Multi-Block Session Manager (Afdeling / Block Partitioning)
-* **Description**: Allow the user to draw and save multiple named polygons (e.g. *Blok A1*, *Blok A2*, *Blok B1*) on the same orthophoto.
-* **Benefit**: The Sensus Summary box displays an estate-wide breakdown table showing per-block tree counts, hectares, and SPH in a single session.
+### Feature 1: Multi-Block Session Manager (Afdeling / Block Partitioning) [COMPLETED]
+* **Status**: Implemented in v2.6. Users can save multiple named polygon blocks (*Blok A1*, *Blok A2*, etc.) on the same flight. Each block is stored in `state.savedBlocks`, rendered with distinct pastel boundary tints and badges, and can be restored or zoomed into with 1 click.
 
-### Feature 2: Crown Health & Nitrogen Defoliation Color Grading
-* **Description**: Since the engine already extracts ExG, VARI, and Green Leaf Index (GLI), grade every detected palm crown into:
-  * 🟢 **Vigorous / Healthy TM**
-  * 🟡 **Nutrient Deficient / Yellowing** (Nitrogen/Magnesium deficiency)
-  * 🔴 **Stunted / Dead Crown**
-* **Benefit**: Transforms PalmSentinel from a pure counter into a precision agriculture health diagnostic tool.
+### Feature 2: Crown Health & Chlorosis Color Grading [COMPLETED]
+* **Status**: Implemented in v2.6. The vision engine assigns `health_status` (`healthy`, `stressed`, `critical`) based on normalized ExG/VARI vegetative indices. Frontend color-grades circles (🟢 Optimal Green, 🟡 Stressed/Chlorosis, 🔴 Critical/Defoliated) and displays a full distribution breakdown in the Sensus Summary card.
 
 ### Feature 3: Automated Planting Grid Alignment & Bearing Detector
 * **Description**: Identify the dominant triangular equilateral planting grid angle (e.g. 30° / 60° / 90° azimuth) and automatically trace rows to identify misplanted or misaligned trees.
 
-### Feature 4: 1-Click Executive PDF Estate Report Generator
-* **Description**: Generate an official, publication-grade PDF report containing:
-  * Estate flight map with annotated block boundaries
-  * Census statistics (Total trees, Hectares, SPH vs 136 standard)
-  * Vacancy & replanting cost estimation (Rp / RM per seedling)
-  * Estimated Fresh Fruit Bunches (FFB) yield projection (metric tons/Ha/year) based on planting age.
+### Feature 4: 1-Click Executive PDF Estate Report Generator [COMPLETED]
+* **Status**: Implemented in v2.6 (`/api/export-report`). Generates a publication-grade, print-ready HTML executive agronomy report complete with FFB yield projections, SPH vs 136 benchmark, mortality rate, financial replanting estimates, and multi-block comparison tables.
 
-### Feature 5: Minimap / Radar Overview Navigator
-* **Description**: A small corner minimap in the canvas showing the full plantation silhouette with a red viewport rectangle indicating where the user is currently zoomed in.
+### Feature 5: Minimap / Radar Overview Navigator [COMPLETED]
+* **Status**: Implemented in v2.6. Picture-in-picture 128×128 radar minimap in `#canvas-container` displays the full plantation silhouette, saved block footprints, and an interactive draggable viewfinder rectangle that centers the main viewport on click or drag.
 
 ---
 
@@ -419,3 +410,15 @@ Whenever an AI agent or engineer modifies PalmSentinel AI Pro, append a new entr
 * **Files Modified**: `SYSTEM_LIVING_LOG.md`
 * **Changes Made**: Compiled 100% complete technical history, architectural blueprints, bug post-mortems, and incoming AI handover instructions.
 * **Verification**: Audit suite verified 42/42 PASS. GitHub CI verified green.
+
+### [2026-09-22 09:00] — Multi-Block Manager, Health Chlorosis Grading, Minimap & Executive Report
+* **Agent / Author**: Antigravity AI (Google DeepMind)
+* **Files Modified**: `engine/detector.py`, `app.py`, `templates/index.html`, `static/app.js`, `audit_suite.py`, `SYSTEM_LIVING_LOG.md`
+* **Changes Made**:
+  * Added ExG canopy health classification (`healthy`, `stressed`, `critical`) to `engine/detector.py` and returned `health_summary` from `/api/count`.
+  * Added `/api/export-report` endpoint generating print/PDF-ready executive agronomy reports with FFB yield modeling.
+  * Added Multi-Block Session Manager (`btn-save-block`, `saved-blocks-list`, block restoration, pastel polygon rendering).
+  * Added interactive Radar Minimap Viewport Navigator with click-and-drag viewfinder panning.
+  * Added canopy health color-coding toggle (`chk-health-colors`) and health statistics card.
+  * Updated `audit_suite.py` to 43 automated checks covering all new endpoints and features.
+* **Verification**: `python audit_suite.py` passed 43/43 tests (100% system integrity). `node -c static/app.js` passed 0 syntax errors.

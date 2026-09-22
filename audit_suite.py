@@ -259,7 +259,24 @@ class PalmSentinelAuditor:
             geo_ok = (r.status_code == 200 and d.get("type") == "FeatureCollection" and len(d.get("features", [])) == 1)
             self.log_result("API", "POST /api/export-geojson (OGC GIS Feature Collection Export)", geo_ok, duration_ms=(time.time()-t0)*1000)
 
-            # 12. Edge Case: Malformed or Out-of-bounds Viewport Patch
+            # 12. POST /api/export-report (Printable / PDF Executive Agronomy Audit)
+            t0 = time.time()
+            r = client.post('/api/export-report', json={
+                'estate_name': 'Kebun Sawit Audit Test',
+                'block_name': 'Blok A1',
+                'total_palms': 136,
+                'area_ha': 1.0,
+                'sph': 136,
+                'sph_status': 'Optimal Standard (136 SPH)',
+                'health_summary': {'healthy_count': 120, 'healthy_pct': 88.2, 'stressed_count': 12, 'stressed_pct': 8.8, 'critical_count': 4, 'critical_pct': 3.0},
+                'gaps_count': 5,
+                'mortality_pct': 3.5,
+                'saved_blocks': [{'name': 'Blok A1', 'total_palms': 136, 'area_ha': 1.0, 'sph': 136}]
+            })
+            report_ok = (r.status_code == 200 and b"Kebun Sawit Audit Test" in r.data and b"Canopy Health Distribution" in r.data)
+            self.log_result("API", "POST /api/export-report (Printable / PDF Executive Audit)", report_ok, f"Size: {len(r.data)} bytes", (time.time()-t0)*1000)
+
+            # 13. Edge Case: Malformed or Out-of-bounds Viewport Patch
             t0 = time.time()
             r = client.get('/api/viewport-patch?x1=5000&y1=5000&x2=3000&y2=3000') # inverted coords
             edge_ok = (r.status_code in [400, 500]) # should gracefully reject

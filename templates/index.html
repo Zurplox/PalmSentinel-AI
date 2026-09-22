@@ -235,7 +235,7 @@
                     </div>
                 </div>
 
-                <!-- 5. BLOCK NAME & EXECUTION -->
+                <!-- 5. BLOCK NAME & MULTI-BLOCK SESSION MANAGER -->
                 <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 space-y-2">
                     <div class="flex justify-between items-center">
                         <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Plantation Block Name</label>
@@ -249,6 +249,19 @@
                         </div>
                     </div>
                     <input id="input-block-name" type="text" value="Blok 1 - TM Utara" class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500" placeholder="Block name...">
+                    
+                    <button id="btn-save-block" class="w-full py-1.5 px-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 rounded text-xs font-medium flex items-center justify-center gap-1.5 transition cursor-pointer" title="Save current block ROI & counts to this session">
+                        <span>💾 Save Block to Estate Session</span>
+                        <span id="badge-saved-blocks-count" class="bg-emerald-950 text-emerald-300 px-1.5 py-0.2 rounded text-[10px] font-mono">0</span>
+                    </button>
+
+                    <!-- Saved Blocks List -->
+                    <div id="saved-blocks-container" class="hidden space-y-1 pt-1 border-t border-slate-800/80">
+                        <span class="text-[10px] text-slate-400 font-semibold block">Estate Multi-Block Inventory:</span>
+                        <div id="saved-blocks-list" class="space-y-1 max-h-28 overflow-y-auto custom-scrollbar pr-0.5">
+                            <!-- Populated dynamically via app.js -->
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Execute Count Button -->
@@ -263,6 +276,10 @@
                 <div class="bg-slate-950/40 p-3 rounded-lg border border-slate-800/80 space-y-2 text-xs">
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Agro-Analytics Overlays</label>
                     <div class="space-y-1.5">
+                        <label class="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
+                            <input id="chk-health-colors" type="checkbox" checked class="accent-emerald-500 rounded">
+                            <span>🌿 Color-Coded Health (ExG Chlorosis)</span>
+                        </label>
                         <label class="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
                             <input id="chk-missing-palms" type="checkbox" class="accent-amber-500 rounded">
                             <span>⚠️ Highlight Missing Palms (Titik Sisipan)</span>
@@ -288,6 +305,9 @@
                             🖼️ Annotated
                         </button>
                     </div>
+                    <button id="btn-export-report" class="export-btn w-full py-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded border border-emerald-400/40 text-center transition flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40">
+                        <span>📑 Generate Printable / PDF Executive Report</span>
+                    </button>
                 </div>
 
             </div>
@@ -310,6 +330,18 @@
                 <div class="mt-3 bg-emerald-950/80 px-3.5 py-1.5 rounded-full border border-emerald-700/50 text-[11px] text-emerald-300 flex items-center gap-2 shadow-lg">
                     <span>🔒</span>
                     <span>100% Local Processing on F: Drive — Never Uploaded to GitHub</span>
+                </div>
+            </div>
+
+            <!-- Radar Minimap Viewport Navigator -->
+            <div id="minimap-container" class="absolute top-4 left-4 bg-slate-900/90 backdrop-blur border border-slate-700/80 rounded-xl p-2 shadow-2xl z-10 flex flex-col items-center select-none">
+                <div class="flex items-center justify-between w-full mb-1.5 px-0.5 text-[10px] font-semibold text-slate-400">
+                    <span class="flex items-center gap-1">🧭 Radar View</span>
+                    <span id="minimap-res" class="text-emerald-400 font-mono text-[9px]">4K Overview</span>
+                </div>
+                <div id="minimap-wrapper" class="relative w-32 h-32 bg-black rounded-lg overflow-hidden border border-slate-800 cursor-crosshair">
+                    <canvas id="minimap-canvas" width="128" height="128" class="w-full h-full block"></canvas>
+                    <div id="minimap-viewfinder" class="absolute border-2 border-emerald-400 bg-emerald-500/20 pointer-events-none rounded-sm transition-all duration-75"></div>
                 </div>
             </div>
 
@@ -370,6 +402,28 @@
                     <p id="stat-status" class="text-[11px] text-slate-400 leading-tight">
                         Draw an area and click "Run Palm Sensus Count" to evaluate.
                     </p>
+                </div>
+
+                <!-- Canopy Health Breakdown (ExG / Chlorosis) -->
+                <div id="stat-health-card" class="hidden bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 space-y-1.5">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300 font-semibold">Canopy Health Distribution</span>
+                        <span id="stat-health-total" class="font-mono text-emerald-400 text-[10px]">100%</span>
+                    </div>
+                    <div class="space-y-1 text-[11px]">
+                        <div class="flex justify-between items-center text-emerald-400">
+                            <span>🟢 Optimal Canopy:</span>
+                            <span id="stat-health-green" class="font-mono font-bold">0 (0%)</span>
+                        </div>
+                        <div class="flex justify-between items-center text-amber-400">
+                            <span>🟡 Stressed / Chlorosis:</span>
+                            <span id="stat-health-yellow" class="font-mono font-bold">0 (0%)</span>
+                        </div>
+                        <div class="flex justify-between items-center text-rose-400">
+                            <span>🔴 Critical / Defoliated:</span>
+                            <span id="stat-health-red" class="font-mono font-bold">0 (0%)</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Gaps & Mortality Stats (Appears after count) -->

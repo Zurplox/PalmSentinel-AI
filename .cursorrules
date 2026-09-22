@@ -1,0 +1,8 @@
+# PalmSentinel AI Pro — Cursor & Copilot Directives
+
+- DO NOT rebuild or scaffold this project from scratch. It is a mature, fully functional system.
+- Primary workspace is `F:\PalmSentinel-AI`.
+- Maintain 100% local privacy: user drone imagery in `data/` must never be tracked or uploaded.
+- All code changes must pass `python audit_suite.py` (43 checks) and `node -c static/app.js`.
+- Respect Photoshop-style canvas controls (Spacebar pan, anchor-point dragging, radar minimap).
+- Consult `SYSTEM_LIVING_LOG.md` for full background, architecture, and bug histories.

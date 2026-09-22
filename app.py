@@ -267,7 +267,20 @@ def count_trees():
 
     # Convert coordinates back to overview scale for client canvas rendering
     overview_palms = []
+    healthy_count = 0
+    stressed_count = 0
+    critical_count = 0
+
     for p in palms:
+        h_status = p.get("health_status", "healthy")
+        h_label = p.get("health_label", "Optimal Green")
+        if h_status == "healthy":
+            healthy_count += 1
+        elif h_status == "stressed":
+            stressed_count += 1
+        else:
+            critical_count += 1
+
         overview_palms.append({
             "id": p["id"],
             "full_x": p["x"],
@@ -276,8 +289,20 @@ def count_trees():
             "y": round(p["y"] / scale, 2),
             "radius": round(p["radius"] / scale, 2),
             "confidence": p["confidence"],
-            "peak_intensity": p.get("peak_intensity", 0)
+            "peak_intensity": p.get("peak_intensity", 0),
+            "health_status": h_status,
+            "health_label": h_label
         })
+
+    total_safe = total_count or 1
+    health_summary = {
+        "healthy_count": healthy_count,
+        "healthy_pct": round((healthy_count / total_safe) * 100, 1),
+        "stressed_count": stressed_count,
+        "stressed_pct": round((stressed_count / total_safe) * 100, 1),
+        "critical_count": critical_count,
+        "critical_pct": round((critical_count / total_safe) * 100, 1)
+    }
 
     # Calculate real-world Area & SPH
     if len(full_polygon) >= 3:
@@ -298,6 +323,7 @@ def count_trees():
         "palms": overview_palms,
         "area_info": area_info,
         "sph_info": sph_info,
+        "health_summary": health_summary,
         "bbox": result["bbox"]
     })
 
@@ -309,7 +335,7 @@ def export_csv():
     scale = CACHE.get("scale_factor", 1.0)
 
     output = io.StringIO()
-    output.write("id,block_name,x_full,y_full,x_overview,y_overview,confidence,crown_radius_full_px\n")
+    output.write("id,block_name,x_full,y_full,x_overview,y_overview,confidence,crown_radius_full_px,health_status,health_label\n")
     for i, p in enumerate(palms, 1):
         fx = p.get("full_x", round(p.get("x", 0) * scale))
         fy = p.get("full_y", round(p.get("y", 0) * scale))
@@ -317,7 +343,9 @@ def export_csv():
         oy = p.get("y", round(fy / scale))
         conf = p.get("confidence", 1.0)
         r = round(p.get("radius", 25) * scale)
-        output.write(f"{i},{block_name},{fx},{fy},{ox},{oy},{conf},{r}\n")
+        hs = p.get("health_status", "healthy")
+        hl = p.get("health_label", "Optimal Green")
+        output.write(f"{i},{block_name},{fx},{fy},{ox},{oy},{conf},{r},{hs},{hl}\n")
 
     output.seek(0)
     return Response(
@@ -411,6 +439,229 @@ def export_annotated_image():
     if max(ch, cw) > max_export:
         down_scale = max_export / max(ch, cw)
         crop = cv2.resize(crop, (int(cw * down_scale), int(ch * down_scale)), interpolation=cv2.INTER_AREA)
+
+    _, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return Response(
+        buf.tobytes(),
+        mimetype="image/jpeg",
+        headers={"Content-Disposition": f"attachment;filename=annotated_{block_name}.jpg"}
+    )
+
+@app.route("/api/export-report", methods=["POST"])
+def export_estate_report():
+    """
+    Generates a publication-grade, printable Executive Sensus & Agronomy Report
+    complete with yield projections, canopy health distribution, and multi-block audits.
+    """
+    data = request.json or {}
+    estate_name = data.get("estate_name", "Perkebunan Kelapa Sawit").strip() or "Perkebunan Kelapa Sawit"
+    block_name = data.get("block_name", "Blok Utama").strip() or "Blok Utama"
+    total_palms = int(data.get("total_palms", 0))
+    area_ha = float(data.get("area_ha", 0.0))
+    sph = float(data.get("sph", 0.0))
+    sph_status = data.get("sph_status", "N/A")
+    health = data.get("health_summary", {})
+    gaps_count = int(data.get("gaps_count", 0))
+    mortality_pct = float(data.get("mortality_pct", 0.0))
+    saved_blocks = data.get("saved_blocks", [])
+
+    optimal_target_trees = round(area_ha * 136)
+    variance = total_palms - optimal_target_trees
+    est_ffb_tonnes_ha = round(24.0 * (min(143.0, max(80.0, sph)) / 136.0), 1) if area_ha > 0 else 0.0
+    est_total_ffb_tonnes = round(est_ffb_tonnes_ha * area_ha, 1)
+    est_annual_loss_idr = gaps_count * 450000
+
+    report_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Executive Drone Sensus Report — {estate_name}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {{
+            body {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+            .no-print {{ display: none !important; }}
+        }}
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 p-8 font-sans max-w-5xl mx-auto">
+    <!-- Action Bar -->
+    <div class="no-print flex justify-between items-center mb-6 bg-slate-900 text-white p-4 rounded-xl shadow-md">
+        <div>
+            <h2 class="font-bold text-sm text-emerald-400">🌴 PalmSentinel AI Pro — Executive Report Preview</h2>
+            <p class="text-xs text-slate-400">Save as branded PDF or print for plantation management</p>
+        </div>
+        <button onclick="window.print()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-xs shadow-lg transition flex items-center gap-1.5 cursor-pointer">
+            <span>🖨️ Print / Save as PDF</span>
+        </button>
+    </div>
+
+    <!-- Official Report Header -->
+    <div class="border-b-2 border-emerald-600 pb-4 mb-6 flex justify-between items-end">
+        <div>
+            <span class="text-xs font-bold uppercase tracking-widest text-emerald-700">Official Drone Sensus & Agronomy Audit</span>
+            <h1 class="text-2xl font-black tracking-tight text-slate-900">{estate_name}</h1>
+            <p class="text-xs text-slate-600 mt-0.5">Active Block: <strong>{block_name}</strong> | Sensor GSD: <strong>{data.get('gsd_cm', 4.0)} cm/px</strong></p>
+        </div>
+        <div class="text-right text-xs text-slate-500">
+            <p>Report Date: <strong>{time.strftime('%d %B %Y')}</strong></p>
+            <p>Verification: <strong class="text-emerald-700">100% Native Orthomosaic Audit</strong></p>
+        </div>
+    </div>
+
+    <!-- Executive KPI Grid -->
+    <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-emerald-800">Total Palm Sensus</span>
+            <p class="text-3xl font-black text-emerald-900 mt-1">{total_palms:,}</p>
+            <span class="text-[10px] text-emerald-700">Canopy Detected</span>
+        </div>
+        <div class="bg-slate-100 border border-slate-200 rounded-xl p-3.5">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Total Block Area</span>
+            <p class="text-3xl font-black text-slate-900 mt-1">{area_ha:.2f} <span class="text-base font-normal">Ha</span></p>
+            <span class="text-[10px] text-slate-500">Polygon Ground Area</span>
+        </div>
+        <div class="bg-slate-100 border border-slate-200 rounded-xl p-3.5">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Stand Density (SPH)</span>
+            <p class="text-3xl font-black text-slate-900 mt-1">{sph:.0f} <span class="text-base font-normal">SPH</span></p>
+            <span class="text-[10px] text-emerald-700 font-medium">{sph_status}</span>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-amber-800">Titik Sisipan / Gaps</span>
+            <p class="text-3xl font-black text-amber-900 mt-1">{gaps_count:,}</p>
+            <span class="text-[10px] text-amber-700">{mortality_pct:.1f}% Mortality Rate</span>
+        </div>
+    </div>
+
+    <!-- Health Distribution & Agronomic Assessment -->
+    <div class="grid grid-cols-2 gap-6 mb-6">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <h3 class="font-bold text-sm text-slate-800 mb-3 flex items-center gap-1.5">
+                <span>🌿 Canopy Health Distribution (ExG/VARI)</span>
+            </h3>
+            <div class="space-y-2.5 text-xs">
+                <div>
+                    <div class="flex justify-between font-semibold text-emerald-800 mb-1">
+                        <span>Healthy TM Canopy</span>
+                        <span>{health.get('healthy_pct', 0)}% ({health.get('healthy_count', 0):,} palms)</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2.5">
+                        <div class="bg-emerald-500 h-2.5 rounded-full" style="width: {health.get('healthy_pct', 0)}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between font-semibold text-amber-800 mb-1">
+                        <span>Mild Chlorosis / Yellowing</span>
+                        <span>{health.get('stressed_pct', 0)}% ({health.get('stressed_count', 0):,} palms)</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2.5">
+                        <div class="bg-amber-500 h-2.5 rounded-full" style="width: {health.get('stressed_pct', 0)}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between font-semibold text-red-800 mb-1">
+                        <span>Severe Defoliation / Dieback</span>
+                        <span>{health.get('critical_pct', 0)}% ({health.get('critical_count', 0):,} palms)</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2.5">
+                        <div class="bg-red-500 h-2.5 rounded-full" style="width: {health.get('critical_pct', 0)}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <h3 class="font-bold text-sm text-slate-800 mb-3 flex items-center gap-1.5">
+                <span>📈 Agronomic Yield Projections</span>
+            </h3>
+            <div class="space-y-2 text-xs text-slate-700">
+                <div class="flex justify-between border-b pb-1">
+                    <span>Benchmark Stand Per Hectare:</span>
+                    <strong class="font-mono">136 - 143 SPH</strong>
+                </div>
+                <div class="flex justify-between border-b pb-1">
+                    <span>Target Planting Count for {area_ha:.1f} Ha:</span>
+                    <strong class="font-mono">{optimal_target_trees:,} palms</strong>
+                </div>
+                <div class="flex justify-between border-b pb-1">
+                    <span>Stand Density Variance:</span>
+                    <strong class="font-mono {'text-emerald-700' if variance >= 0 else 'text-red-700'}">{variance:+,} palms</strong>
+                </div>
+                <div class="flex justify-between border-b pb-1">
+                    <span>Projected Fresh Fruit Bunch (FFB):</span>
+                    <strong class="font-mono text-emerald-800">{est_ffb_tonnes_ha} Tonnes / Ha / Year</strong>
+                </div>
+                <div class="flex justify-between border-b pb-1">
+                    <span>Estimated Annual Estate FFB:</span>
+                    <strong class="font-mono text-emerald-800">{est_total_ffb_tonnes:,.1f} Tonnes / Year</strong>
+                </div>
+                <div class="flex justify-between pt-0.5">
+                    <span>Estimated Vacancy Opportunity Loss:</span>
+                    <strong class="font-mono text-red-700">Rp {est_annual_loss_idr:,.0f} / Year</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+"""
+
+    if saved_blocks:
+        report_html += """
+    <!-- Multi-Block Partitioning Table -->
+    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-6">
+        <h3 class="font-bold text-sm text-slate-800 mb-3">📑 Multi-Block Sensus Breakdown (Afdeling)</h3>
+        <table class="w-full text-xs text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-100 border-b border-slate-200 text-slate-700">
+                    <th class="py-2 px-3">#</th>
+                    <th class="py-2 px-3">Block Name</th>
+                    <th class="py-2 px-3 text-right">Area (Ha)</th>
+                    <th class="py-2 px-3 text-right">Palm Count</th>
+                    <th class="py-2 px-3 text-right">SPH</th>
+                    <th class="py-2 px-3">Agronomic Status</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+        for i, b in enumerate(saved_blocks, 1):
+            report_html += f"""
+                <tr class="border-b border-slate-100 hover:bg-slate-50">
+                    <td class="py-2 px-3 font-mono">{i}</td>
+                    <td class="py-2 px-3 font-bold text-slate-800">{b.get('name', f'Block {i}')}</td>
+                    <td class="py-2 px-3 text-right font-mono">{float(b.get('areaHa', 0)):.2f} Ha</td>
+                    <td class="py-2 px-3 text-right font-mono font-bold text-emerald-700">{int(b.get('palmCount', 0)):,}</td>
+                    <td class="py-2 px-3 text-right font-mono">{float(b.get('sph', 0)):.0f}</td>
+                    <td class="py-2 px-3 text-slate-600">{b.get('status', 'Audited')}</td>
+                </tr>
+            """
+        report_html += """
+            </tbody>
+        </table>
+    </div>
+        """
+
+    report_html += """
+    <!-- Signatures -->
+    <div class="border-t border-slate-300 pt-6 mt-8 grid grid-cols-3 gap-8 text-xs text-slate-600">
+        <div>
+            <p class="font-bold text-slate-800 mb-8">Prepared by (Drone Pilot):</p>
+            <div class="border-b border-slate-400 w-40 mb-1"></div>
+            <p>GIS & Remote Sensing Unit</p>
+        </div>
+        <div>
+            <p class="font-bold text-slate-800 mb-8">Agronomy Verification:</p>
+            <div class="border-b border-slate-400 w-40 mb-1"></div>
+            <p>Head Agronomist / Asisten Kebun</p>
+        </div>
+        <div>
+            <p class="font-bold text-slate-800 mb-8">Estate Approval:</p>
+            <div class="border-b border-slate-400 w-40 mb-1"></div>
+            <p>Estate Manager / Askep</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+    return Response(report_html, mimetype="text/html")
 
 @app.route("/api/viewport-patch", methods=["GET"])
 def get_viewport_patch():
