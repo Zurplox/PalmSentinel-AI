@@ -19,6 +19,7 @@ if sys.platform == "win32":
 Image.MAX_IMAGE_PIXELS = None
 
 from flask import Flask, render_template, request, jsonify, send_file, Response
+from werkzeug.utils import secure_filename
 from engine.detector import PalmDetector, PRESETS, DetectionPreset
 from engine.roi_utils import calculate_polygon_area, calculate_sph, filter_points_by_polygon
 from engine.tiler import TiledProcessor
@@ -155,15 +156,22 @@ def load_image_endpoint():
     if "file" in request.files:
         f = request.files["file"]
         if f and f.filename:
+            raw_name = secure_filename(os.path.basename(f.filename))
+            if not raw_name:
+                raw_name = f"drone_upload_{int(time.time())}.jpg"
+            ext = os.path.splitext(raw_name)[1].lower()
+            if ext not in ('.jpg', '.jpeg', '.png', '.tif', '.tiff'):
+                return jsonify({"success": False, "error": "Invalid file type. Allowed: .jpg, .png, .tif"}), 400
+
             data_dir = os.path.join(BASE_DIR, "data")
             os.makedirs(data_dir, exist_ok=True)
-            save_path = os.path.join(data_dir, f.filename)
+            save_path = os.path.join(data_dir, raw_name)
             f.save(save_path)
             if get_or_load_image(save_path):
                 return jsonify({
                     "success": True,
-                    "message": f"Uploaded & Loaded {f.filename}",
-                    "filename": f.filename,
+                    "message": f"Uploaded & Loaded {raw_name}",
+                    "filename": raw_name,
                     "path": save_path
                 })
             else:
@@ -374,13 +382,23 @@ def export_geojson():
             "properties": {
                 "tree_id": i,
                 "block": block_name,
-                "confidence": p.get("confidence", 1.0)
+                "confidence": p.get("confidence", 1.0),
+                "crown_radius_px": p.get("radius", 25),
+                "health_status": p.get("health_status", "healthy"),
+                "health_label": p.get("health_label", "Optimal Green")
             }
         })
 
     geojson = {
         "type": "FeatureCollection",
         "name": f"PalmSensus_{block_name}",
+        "crs": {
+            "type": "name",
+            "properties": {
+                "name": "urn:ogc:def:crs:OGC:1.3:CRS84",
+                "coordinate_type": "Full-Resolution Orthophoto Pixel Space [X, Y]"
+            }
+        },
         "features": features
     }
 
@@ -907,4 +925,4 @@ if __name__ == "__main__":
     print("🌴 PalmSensus AI Server Running!")
     print("👉 Open your browser at: http://127.0.0.1:5000")
     print("="*60 + "\n")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="127.0.0.1", port=5000, debug=False)

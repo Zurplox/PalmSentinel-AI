@@ -30,6 +30,10 @@ jobs:
         run: |
           python -m unittest discover -s tests -v
 
+      - name: Run 47-Point Comprehensive System Audit Suite
+        run: |
+          python audit_suite.py
+
       - name: Verify Core Modules Import
         run: |
           python -c "import engine.detector, engine.roi_utils, engine.tiler, app; print('All core modules loaded and verified successfully!')"

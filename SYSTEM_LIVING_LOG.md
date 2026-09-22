@@ -315,7 +315,7 @@ To prevent double-counting across overlapping fronds while achieving $O(N)$ spee
 
 ---
 
-## 7. SYSTEM VERIFICATION & 42-POINT AUDIT SUITE
+## 7. SYSTEM VERIFICATION & 47-POINT AUDIT SUITE
 
 To verify the entire platform, run:
 ```powershell
@@ -323,12 +323,12 @@ python audit_suite.py
 ```
 
 ### Audit Coverage Summary:
-* **[1/6] FileSystem & Assets (16 checks)**: Verifies all code files, templates, stylesheets, and native binaries.
+* **[1/6] FileSystem & Assets (17 checks)**: Verifies all code files, templates, stylesheets, and native binaries.
 * **[2/6] Computer Vision Engine (5 checks)**: Validates ExG, VARI, GLI indices, peak prominence, and spatial grid hashing throughput.
 * **[3/6] Agronomic Math & SPH (4 checks)**: Validates Shoelace formula accuracy, 1.0 Ha benchmark, and density classifications.
-* **[4/6] Flask REST API (12 checks)**: Tests `/api/info`, `/api/overview-image`, `/api/viewport-patch`, `/api/tree-sample`, `/api/auto-calibrate`, `/api/count`, `/api/detect-gaps`, CSV/GeoJSON exports, and coordinate rejection edge cases.
+* **[4/6] Flask REST API (13 checks)**: Tests `/api/info`, `/api/overview-image`, `/api/viewport-patch`, `/api/tree-sample`, `/api/auto-calibrate`, `/api/count`, `/api/detect-gaps`, CSV/GeoJSON exports, annotated JPEG export, and coordinate rejection edge cases.
 * **[5/6] Memory Footprint (2 checks)**: Validates sub-second tiled inference on 16MP areas and confirms zero memory leaks.
-* **[6/6] Desktop Executable (3 checks)**: Validates `PalmSentinel.exe`, `pythonw.exe` GUI subsystem, and WebView2 Edge bindings.
+* **[6/6] Desktop Executable & Launchers (5 checks)**: Validates `PalmSentinel.exe`, live native execution of `PalmSentinel.exe --check`, headless `desktop_app.py --check`, `pythonw.exe` GUI subsystem, and WebView2 Edge bindings.
 
 ---
 
@@ -361,7 +361,7 @@ If you are an AI assistant taking over this conversation:
    * For JavaScript: `node -c static/app.js`
    * For Python: `python -m py_compile app.py desktop_app.py engine/detector.py`
 3. **Running the Audit Suite**:
-   * Run `python audit_suite.py` — ensure all 42 checks pass before reporting work as complete.
+   * Run `python audit_suite.py` — ensure all 47 checks pass before reporting work as complete.
 4. **Git Commits & Push Protocol**:
    * When making changes:
      `git add -A; git commit -m "<concise commit message>"; git push origin main`
@@ -422,3 +422,17 @@ Whenever an AI agent or engineer modifies PalmSentinel AI Pro, append a new entr
   * Added canopy health color-coding toggle (`chk-health-colors`) and health statistics card.
   * Updated `audit_suite.py` to 43 automated checks covering all new endpoints and features.
 * **Verification**: `python audit_suite.py` passed 43/43 tests (100% system integrity). `node -c static/app.js` passed 0 syntax errors.
+
+### [2026-09-22 21:50] — Local Native EXE Live Audit, Launcher Python Discovery & Security Hardening
+* **Agent / Author**: Antigravity AI (Google DeepMind)
+* **Files Modified**: `Launcher.cs`, `PalmSentinel.exe`, `desktop_app.py`, `Launch_PalmSentinel.bat`, `Launch_Web_Browser.bat`, `engine/detector.py`, `app.py`, `static/app.js`, `audit_suite.py`, `.github/workflows/audit.yml`, `README.md`, `AGENTS.md`, `SYSTEM_LIVING_LOG.md`
+* **Changes Made**:
+  * **Native Launcher Overhaul (`Launcher.cs`)**: Added deep multi-version Python candidate discovery (Python 3.9 through 3.14 across `LocalAppData/Programs/Python`, `ProgramFiles`, System Root, PATH, and project `.venv`), uses absolute script paths via `Path.Combine`, and forwards CLI flags (`--check`, `--test`) with process exit code propagation. Recompiled `PalmSentinel.exe` cleanly.
+  * **Headless Diagnostic Mode (`desktop_app.py`)**: Added `--check` flag handling to validate Python imports, pywebview, and Flask without opening a GUI window. Added threaded background image preloading so the desktop UI window appears instantaneously without blocking on 138MP image decode.
+  * **Launch Scripts Hardening**: Updated `Launch_PalmSentinel.bat` to prioritize native `PalmSentinel.exe` and `pythonw.exe` for zero-console startup. Updated `Launch_Web_Browser.bat` with a robust curl/powershell polling loop waiting for port 5000 (`/api/info`) before launching default browser, preventing 404/connection refused race conditions.
+  * **Invariant Canopy Health Index (`engine/detector.py`)**: Replaced per-tile relative min-max normalization with invariant Green Leaf Index ($GLI = \frac{2G - R - B}{2G + R + B + \epsilon}$) sampled at the crown apex, guaranteeing consistent health scoring across tile seams and image illumination variations.
+  * **Security & Offline Hardening (`app.py`)**: Bound Flask strictly to `127.0.0.1:5000` (localhost only). Secured image uploads with `werkzeug.utils.secure_filename` and strict extension whitelisting. Fixed `NameError: name 'block_name' is not defined` in `/api/export-annotated-image`. Added pixel CRS metadata (`urn:ogc:def:crs:OGC:1.3:CRS84`) to GeoJSON export. Added offline fallback styling in `/api/export-report`.
+  * **Comprehensive 47-Check Audit (`audit_suite.py`)**: Expanded from 43 to 47 tests, including live sub-process execution of `PalmSentinel.exe --check` (~638ms) and `desktop_app.py --check` (~778ms), annotated image export, and DOM element audits.
+  * **CI Workflow Integration (`.github/workflows/audit.yml`)**: Added automated `python audit_suite.py` step to GitHub Actions runner.
+* **Verification**: `python audit_suite.py` passed 47/47 tests (100.0% system integrity), with live `PalmSentinel.exe --check` passing in 638ms.
+

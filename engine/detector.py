@@ -174,11 +174,24 @@ class PalmDetector:
         estimated_crown_radius = max(15, int(min_dist * 0.45))
 
         for idx, (lx, ly, score) in enumerate(accepted_local, 1):
-            # Crown health grading based on photosynthetic foliage density
-            if score >= 82:
+            # Scale-invariant crown health grading based on Green Leaf Index (GLI) at apex
+            # GLI = (2G - R - B) / (2G + R + B + eps), which is invariant to tile NORM_MINMAX
+            wy1 = max(0, int(ly) - 2)
+            wy2 = min(image_bgr.shape[0], int(ly) + 3)
+            wx1 = max(0, int(lx) - 2)
+            wx2 = min(image_bgr.shape[1], int(lx) + 3)
+            patch = image_bgr[wy1:wy2, wx1:wx2].astype(np.float32)
+            
+            b_mean = float(np.mean(patch[:, :, 0]))
+            g_mean = float(np.mean(patch[:, :, 1]))
+            r_mean = float(np.mean(patch[:, :, 2]))
+            denom = 2.0 * g_mean + r_mean + b_mean + 1e-5
+            gli = (2.0 * g_mean - r_mean - b_mean) / denom
+
+            if gli >= 0.08 or score >= 88:
                 health_status = "healthy"
                 health_label = "Optimal Green"
-            elif score >= 66:
+            elif gli >= 0.02 or score >= 68:
                 health_status = "stressed"
                 health_label = "Mild Chlorosis"
             else:

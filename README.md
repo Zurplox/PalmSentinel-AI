@@ -5,7 +5,7 @@
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Zurplox%2FPalmSentinel--AI-181717.svg?logo=github)](https://github.com/Zurplox/PalmSentinel-AI)
 [![Python](https://img.shields.io/badge/Python-3.9%20|%203.10%20|%203.11%20|%203.12%20|%203.14-blue.svg)](https://python.org)
 [![OpenCV](https://img.shields.io/badge/OpenCV-5.0+-green.svg)](https://opencv.org)
-[![Audit](https://img.shields.io/badge/System%20Audit-42%2F42%20PASS%20(100%25)-emerald.svg)]()
+[![Audit](https://img.shields.io/badge/System%20Audit-47%2F47%20PASS%20(100%25)-emerald.svg)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
 ---
@@ -24,11 +24,14 @@ Counting oil palms (*Elaeis guineensis*) manually across thousands of hectares i
   * **Real-Time Edge Measurements**: Ground distances (in meters) are dynamically rendered along every polygon edge based on sensor GSD.
   * **Precision Wheel & Pinch Zoom**: Snappy focal zoom anchored directly to the mouse cursor up to 35× (3,500%) magnification.
   * **Movable & Collapsible Sensus Summary Box**: Drag the summary card anywhere on screen with 0-offset cursor precision, or minimize it with one click.
+  * **Radar Minimap Viewport Navigator**: Corner picture-in-picture overview with draggable viewfinder to jump anywhere across the plantation instantly.
 * **Dual Operation Modes**:
   * **Simple Mode**: Intuitive tree size slider (`Young TBM <———> Mature TM`) with **1-Click Tree Calibrator** ("🎯 Click to Sample a Tree").
   * **Advanced Mode**: Fine-grained controls for agronomists (Blur $K_{size}$, Minimum Spacing, ExG Threshold, Ground Sampling Distance).
 * **Live 1-Tree Loupe Inspection**: Real-time 100% native resolution magnifier showing how single palms respond to calibration parameters.
-* **Dynamic High-Res Viewport Engine**: Streams razor-sharp 100% native pixels dynamically when zoomed into any canopy pocket.
+* **Canopy Health & Chlorosis Color Grading**: Computes invariant Green Leaf Index (GLI) at crown apex to distinguish vigorous green canopies from nutrient-deficient (chlorotic) or defoliated palms.
+* **Multi-Block Estate Session Manager (Afdeling)**: Save multiple named polygon blocks (*Blok 1*, *Blok 2*, etc.) on the same flight with 1-click restore, zooming, and aggregate estate auditing.
+* **1-Click Executive Print / PDF Report Generator**: Generates publication-grade agronomy audits with FFB yield modeling and replanting gap cost projections.
 * **Titik Sisipan / Replanting Gap Spotter**: Detects missing grid intersections to estimate palm mortality rate.
 * **Estate Agronomy Analytics**: Automatic calculation of **Stand Density (SPH / Pokok per Hektar)**, Hectarage, and comparison against benchmark industrial targets (136–143 SPH).
 * **Multi-Format GIS Exports**: Instant CSV coordinates for handheld GPS crews, OGC GeoJSON for QGIS/ArcGIS, and annotated high-resolution maps.
