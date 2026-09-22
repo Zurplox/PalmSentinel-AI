@@ -1484,9 +1484,19 @@ function handleMouseDown(e) {
         }
 
         if (state.currentTool === 'poly') {
+            const now = Date.now();
+            // Guard: ignore the 2nd rapid click that is part of a dblclick sequence
+            // (dblclick fires ~20-300ms after first click; the second mousedown would
+            //  otherwise start a stray 1-point polygon before dblclick fires)
+            const isDblClickSecond = (now - (state._lastPolyClickTime || 0)) < 320;
+            state._lastPolyClickTime = now;
+
             if (!state.isDrawingPoly) {
-                state.polygon = [pt];
-                state.isDrawingPoly = true;
+                // Don't start a new polygon if this looks like the 2nd click of a dblclick
+                if (!isDblClickSecond) {
+                    state.polygon = [pt];
+                    state.isDrawingPoly = true;
+                }
             } else {
                 const first = state.polygon[0];
                 const dist = Math.hypot(pt.x - first.x, pt.y - first.y);
@@ -1611,11 +1621,20 @@ function handleMouseUp(e) {
 }
 
 function handleDoubleClick(e) {
-    if (state.currentTool === 'poly' && state.isDrawingPoly) {
-        state.isDrawingPoly = false;
-        state.hoverPoint = null;
-        render();
-        return;
+    if (state.currentTool === 'poly') {
+        if (state.isDrawingPoly) {
+            // Close the polygon
+            state.isDrawingPoly = false;
+            state.hoverPoint = null;
+            render();
+            return;
+        } else if (state.polygon.length === 1) {
+            // Clean up stray 1-point ghost polygon that slipped through from the second click
+            state.polygon = [];
+            state.isDrawingPoly = false;
+            render();
+            return;
+        }
     }
     // Double click on map zooms straight into that point
     const rect = canvas.getBoundingClientRect();

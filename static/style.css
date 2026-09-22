@@ -63,6 +63,10 @@ input[type="range"] {
 #loupe-circle {
     transition: width 0.1s ease, height 0.1s ease;
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    /* Centered over the image at all times */
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
 /* Prevent native browser UI zooming and accidental gesture scrolling */
