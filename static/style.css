@@ -104,3 +104,18 @@ html, body {
 #analytics-card-header:active {
     cursor: grabbing;
 }
+
+/* Feature E: SPH Benchmark Progress Bar Transitions */
+#sph-bar {
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+}
+
+/* Feature F: Shortcuts Modal & backdrop transition */
+#shortcuts-panel {
+    animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+}

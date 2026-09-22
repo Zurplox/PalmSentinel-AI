@@ -20,7 +20,7 @@ Image.MAX_IMAGE_PIXELS = None
 
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
-from engine.detector import PalmDetector, PRESETS, DetectionPreset
+from engine.detector import PalmDetector, PRESETS, DetectionPreset, detect_row_bearing, classify_age_summary
 from engine.roi_utils import calculate_polygon_area, calculate_sph, filter_points_by_polygon
 from engine.tiler import TiledProcessor
 
@@ -312,6 +312,18 @@ def count_trees():
         "critical_pct": round((critical_count / total_safe) * 100, 1)
     }
 
+    # FEATURE A: Row bearing detection (use full-pixel coordinates for accuracy)
+    row_bearing_info = {"row_bearing_deg": 0.0, "row_confidence": 0.0, "secondary_deg": 90.0}
+    if total_count >= 4:
+        # Pass palms in full-resolution coordinates for accurate distance thresholding
+        full_palms_for_bearing = [{"x": p["full_x"], "y": p["full_y"]} for p in overview_palms]
+        row_bearing_info = detect_row_bearing(full_palms_for_bearing, max_neighbour_dist=200.0 * scale)
+
+    # FEATURE B: Age / maturity class classification
+    age_summary = {}
+    if total_count >= 1:
+        age_summary = classify_age_summary(overview_palms, gsd_cm=gsd_cm)
+
     # Calculate real-world Area & SPH
     if len(full_polygon) >= 3:
         area_info = calculate_polygon_area(full_polygon, gsd_cm_per_pixel=gsd_cm)
@@ -332,6 +344,8 @@ def count_trees():
         "area_info": area_info,
         "sph_info": sph_info,
         "health_summary": health_summary,
+        "row_bearing": row_bearing_info,
+        "age_summary": age_summary,
         "bbox": result["bbox"]
     })
 

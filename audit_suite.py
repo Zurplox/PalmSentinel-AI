@@ -267,6 +267,16 @@ class PalmSentinelAuditor:
             count_ok = (r.status_code == 200 and d.get("success") is True and d.get("total_count", 0) > 0)
             self.log_result("API", "POST /api/count (High-Precision Tiled Sensus Count)", count_ok, f"Detected: {d.get('total_count')} palms in {d.get('process_time_s')}s", (time.time()-t0)*1000)
 
+            # 8a. Planting Row Bearing & Compass Validation
+            row_info = d.get("row_bearing", {})
+            row_ok = ("row_bearing_deg" in row_info and "row_confidence" in row_info)
+            self.log_result("API", "Agro-Analytics > Planting Row Bearing & Azimuth", row_ok, f"Azimuth: {row_info.get('row_bearing_deg')}° (Conf: {round(row_info.get('row_confidence', 0)*100)}%)")
+
+            # 8b. Palm Age / Maturity Classification Validation
+            age_info = d.get("age_summary", {})
+            age_ok = ("classes" in age_info and "dominant_class" in age_info and len(age_info["classes"]) == 4)
+            self.log_result("API", "Agro-Analytics > Palm Age / Maturity Tiers", age_ok, f"Dominant: {age_info.get('dominant_class')}")
+
             # 9. POST /api/detect-gaps (Titik Sisipan)
             t0 = time.time()
             palms_sample = [{'id': i, 'x': x, 'y': y} for i, (x, y) in enumerate([(100, 100), (100, 200), (200, 100), (200, 200)], 1)]

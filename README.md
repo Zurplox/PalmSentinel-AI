@@ -5,7 +5,7 @@
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Zurplox%2FPalmSentinel--AI-181717.svg?logo=github)](https://github.com/Zurplox/PalmSentinel-AI)
 [![Python](https://img.shields.io/badge/Python-3.9%20|%203.10%20|%203.11%20|%203.12%20|%203.14-blue.svg)](https://python.org)
 [![OpenCV](https://img.shields.io/badge/OpenCV-5.0+-green.svg)](https://opencv.org)
-[![Audit](https://img.shields.io/badge/System%20Audit-47%2F47%20PASS%20(100%25)-emerald.svg)]()
+[![Audit](https://img.shields.io/badge/System%20Audit-49%2F49%20PASS%20(100%25)-emerald.svg)]()
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 
 ---

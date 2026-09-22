@@ -361,7 +361,7 @@ If you are an AI assistant taking over this conversation:
    * For JavaScript: `node -c static/app.js`
    * For Python: `python -m py_compile app.py desktop_app.py engine/detector.py`
 3. **Running the Audit Suite**:
-   * Run `python audit_suite.py` — ensure all 47 checks pass before reporting work as complete.
+   * Run `python audit_suite.py` — ensure all 49 checks pass before reporting work as complete.
 4. **Git Commits & Push Protocol**:
    * When making changes:
      `git add -A; git commit -m "<concise commit message>"; git push origin main`
@@ -435,4 +435,18 @@ Whenever an AI agent or engineer modifies PalmSentinel AI Pro, append a new entr
   * **Comprehensive 47-Check Audit (`audit_suite.py`)**: Expanded from 43 to 47 tests, including live sub-process execution of `PalmSentinel.exe --check` (~638ms) and `desktop_app.py --check` (~778ms), annotated image export, and DOM element audits.
   * **CI Workflow Integration (`.github/workflows/audit.yml`)**: Added automated `python audit_suite.py` step to GitHub Actions runner.
 * **Verification**: `python audit_suite.py` passed 47/47 tests (100.0% system integrity), with live `PalmSentinel.exe --check` passing in 638ms.
+
+### [2026-09-23 07:15] — v2.7 Enterprise Capabilities: Planting Row Bearing, Age Estimation, Undo/Redo & Viewport Screenshot
+* **Agent / Author**: Antigravity AI (Google DeepMind)
+* **Files Modified**: `engine/detector.py`, `app.py`, `templates/index.html`, `static/app.js`, `static/style.css`, `audit_suite.py`, `README.md`, `SYSTEM_LIVING_LOG.md`
+* **Changes Made**:
+  * **Feature A: Planting Row Bearing & Compass (`engine/detector.py`, `app.py`, `static/app.js`)**: Implemented nearest-neighbor angle histogram analysis to calculate dominant planting azimuth (0–180°), confidence score, and cross-row axis. Canvas renders dashed sky-blue row alignment lines when `chk-row-bearing` is toggled.
+  * **Feature B: Palm Age / Maturity Tiers (`engine/detector.py`, `app.py`, `templates/index.html`, `static/app.js`)**: GSD-normalized crown diameter classification into TBM (<3m), Immature (3–5.5m), Mature TM (5.5–9.5m), and Senescent (>9.5m). Dynamic breakdown card with color dots in Sensus Summary.
+  * **Feature C: Client-Side Viewport PNG Screenshot (`static/app.js`, `templates/index.html`)**: Added `btn-screenshot` button using `canvas.toBlob('image/png')` for instant one-click capture of current view without server latency.
+  * **Feature D: Edit Mode Undo/Redo Stack (`static/app.js`)**: Manual marker additions and deletions now push history snapshots. Supported with `Ctrl+Z` (undo) and `Ctrl+Y` / `Ctrl+Shift+Z` (redo).
+  * **Feature E: SPH Benchmark Progress Bar (`templates/index.html`, `static/app.js`, `static/style.css`)**: Horizontal density progress bar relative to the 136 SPH industry benchmark with dynamic color coding (red < 110, amber 110–130, emerald 130–148, blue > 148).
+  * **Feature F: Keyboard Shortcuts Help Modal (`templates/index.html`, `static/app.js`, `static/style.css`)**: Accessible via `?` or `F1`, and dismissible via `Esc` or close button.
+  * **Audit Suite Expansion (`audit_suite.py`)**: Expanded to 49 checks, adding validation for Planting Row Bearing azimuth and Palm Age / Maturity Tiers.
+* **Verification**: `python audit_suite.py` passed 49/49 tests (100.0% PASS). Node JS syntax check clean. All 5 Python modules compiled with zero errors.
+
 

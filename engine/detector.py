@@ -257,3 +257,115 @@ class PalmDetector:
                     )
 
         return annotated
+
+
+# ---------------------------------------------------------------------------
+# FEATURE A: Planting Row Bearing Detector
+# ---------------------------------------------------------------------------
+def detect_row_bearing(palms: List[Dict[str, Any]], max_neighbour_dist: float = 200.0) -> Dict[str, Any]:
+    """
+    Detect the dominant planting row azimuth (bearing) of a palm stand by analysing
+    the angle histogram of all short inter-palm vectors.
+
+    Returns dict with:
+        row_bearing_deg  – dominant bearing in [0, 180) degrees (symmetric axes)
+        row_confidence   – 0.0–1.0 quality score (peak prominence ratio in histogram)
+        secondary_deg    – secondary orthogonal bearing (perpendicular row/column axis)
+    """
+    if len(palms) < 4:
+        return {"row_bearing_deg": 0.0, "row_confidence": 0.0, "secondary_deg": 90.0}
+
+    pts = np.array([[p["x"], p["y"]] for p in palms], dtype=np.float32)
+
+    angles = []
+    for i in range(len(pts)):
+        diffs = pts - pts[i]           # vectors from palm i to all others
+        dists = np.hypot(diffs[:, 0], diffs[:, 1])
+        mask = (dists > 0) & (dists < max_neighbour_dist)
+        if not np.any(mask):
+            continue
+        near_diffs = diffs[mask]
+        raw_angles = np.degrees(np.arctan2(near_diffs[:, 1], near_diffs[:, 0]))
+        # Fold to [0, 180) — rows are symmetric axes, not rays
+        sym_angles = raw_angles % 180.0
+        angles.extend(sym_angles.tolist())
+
+    if len(angles) < 3:
+        return {"row_bearing_deg": 0.0, "row_confidence": 0.0, "secondary_deg": 90.0}
+
+    # Build histogram with 1° resolution
+    hist, bins = np.histogram(angles, bins=180, range=(0, 180))
+    # Smooth with a 5° window to reduce noise
+    from numpy.lib.stride_tricks import sliding_window_view
+    kernel = np.ones(5) / 5.0
+    hist_smooth = np.convolve(hist.astype(float), kernel, mode='same')
+
+    peak_idx = int(np.argmax(hist_smooth))
+    dominant_bearing = float(bins[peak_idx] + 0.5)
+
+    # Confidence: peak height vs mean height ratio
+    mean_val = float(np.mean(hist_smooth)) or 1.0
+    confidence = min(1.0, float(hist_smooth[peak_idx]) / (mean_val * 3.0))
+
+    # Secondary axis is perpendicular (90° offset, wrapped)
+    secondary = (dominant_bearing + 90.0) % 180.0
+
+    return {
+        "row_bearing_deg": round(dominant_bearing, 1),
+        "row_confidence": round(confidence, 3),
+        "secondary_deg": round(secondary, 1)
+    }
+
+
+# ---------------------------------------------------------------------------
+# FEATURE B: Palm Age / Maturity Class Estimator
+# ---------------------------------------------------------------------------
+# Crown diameter thresholds in metres (GSD-normalised)
+# TBM (Tanaman Belum Menghasilkan) < 3.0m diameter
+# Immature  3.0 – 5.5m
+# Mature TM 5.5 – 9.5m
+# Old / Senescent > 9.5m
+_AGE_THRESHOLDS_M = [3.0, 5.5, 9.5]
+_AGE_LABELS = ["TBM (Young)", "Immature (3–5yr)", "Mature TM", "Old / Senescent"]
+_AGE_COLORS = ["#60a5fa", "#34d399", "#22c55e", "#a3e635"]   # blue, mint, green, lime
+
+def classify_age_summary(palms: List[Dict[str, Any]], gsd_cm: float = 4.0) -> Dict[str, Any]:
+    """
+    Classify each palm by crown diameter (radius_px * 2 * gsd_cm / 100 metres)
+    into age/maturity tiers and return a summary dictionary.
+    """
+    gsd_m = gsd_cm / 100.0
+    counts = [0, 0, 0, 0]
+
+    per_palm = []
+    for p in palms:
+        r_px = p.get("radius", 0) or 0
+        diameter_m = r_px * 2.0 * gsd_m
+        if diameter_m < _AGE_THRESHOLDS_M[0]:
+            tier = 0
+        elif diameter_m < _AGE_THRESHOLDS_M[1]:
+            tier = 1
+        elif diameter_m < _AGE_THRESHOLDS_M[2]:
+            tier = 2
+        else:
+            tier = 3
+        counts[tier] += 1
+        per_palm.append({"id": p.get("id"), "age_tier": tier, "age_label": _AGE_LABELS[tier]})
+
+    total = len(palms) or 1
+    classes = []
+    for i, (label, color, count) in enumerate(zip(_AGE_LABELS, _AGE_COLORS, counts)):
+        classes.append({
+            "label": label,
+            "count": count,
+            "pct": round(count / total * 100, 1),
+            "color": color
+        })
+
+    dominant_tier = int(np.argmax(counts))
+    return {
+        "classes": classes,
+        "dominant_class": _AGE_LABELS[dominant_tier],
+        "total": total,
+        "per_palm": per_palm
+    }

@@ -58,7 +58,18 @@ const state = {
     // UI Options
     showNumbers: true,
     showCircles: true,
-    activeBlockName: "Blok 1 - TM Utara"
+    activeBlockName: "Blok 1 - TM Utara",
+
+    // Feature A: Row bearing data (populated after count)
+    rowBearing: null,       // { row_bearing_deg, row_confidence, secondary_deg } from API
+    showRowBearing: false,  // toggled by chk-row-bearing
+
+    // Feature D: Edit mode undo/redo stacks
+    editHistory: [],   // each entry = snapshot of state.palms array before the edit
+    editFuture: [],    // entries undone (available for redo)
+
+    // Feature B: Age summary (populated after count)
+    ageSummary: null
 };
 
 // DOM Elements
@@ -162,6 +173,25 @@ const statHealthRed = document.getElementById('stat-health-red');
 const minimapCanvas = document.getElementById('minimap-canvas');
 const minimapWrapper = document.getElementById('minimap-wrapper');
 const minimapViewfinder = document.getElementById('minimap-viewfinder');
+
+// v2.7 New Feature Elements
+const chkRowBearing = document.getElementById('chk-row-bearing');
+const badgeRowBearing = document.getElementById('badge-row-bearing');
+const statRowCard = document.getElementById('stat-row-card');
+const statRowBearing = document.getElementById('stat-row-bearing');
+const statRowConfidence = document.getElementById('stat-row-confidence');
+const statRowSecondary = document.getElementById('stat-row-secondary');
+
+const statAgeCard = document.getElementById('stat-age-card');
+const statAgeDominant = document.getElementById('stat-age-dominant');
+const statAgeBars = document.getElementById('stat-age-bars');
+
+const sphBar = document.getElementById('sph-bar');
+
+const btnScreenshot = document.getElementById('btn-screenshot');
+const shortcutsPanel = document.getElementById('shortcuts-panel');
+const btnShortcutsHelp = document.getElementById('btn-shortcuts-help');
+const btnCloseShortcuts = document.getElementById('btn-close-shortcuts');
 
 // Initialize
 async function initApp() {
@@ -731,6 +761,50 @@ function render() {
         }
     }
 
+    // 6.5 Feature A: Planting Row Alignment Guide Lines
+    if (state.showRowBearing && state.rowBearing && state.palms.length >= 4) {
+        ctx.save();
+        const bearingRad = (state.rowBearing.row_bearing_deg * Math.PI) / 180.0;
+        const cosA = Math.cos(bearingRad);
+        const sinA = Math.sin(bearingRad);
+        const nx = -sinA;
+        const ny = cosA;
+
+        const spacing = (parseFloat(sliderSpacing ? sliderSpacing.value : 68) || 68) / (state.info ? state.info.scale_factor : 1.0);
+        const rowBinMap = new Map();
+
+        for (let p of state.palms) {
+            const projNorm = p.x * nx + p.y * ny;
+            const binKey = Math.round(projNorm / spacing);
+            if (!rowBinMap.has(binKey)) rowBinMap.set(binKey, []);
+            rowBinMap.get(binKey).push(p);
+        }
+
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.45)";
+        ctx.lineWidth = 1.5 / state.zoom;
+        ctx.setLineDash([8 / state.zoom, 4 / state.zoom]);
+
+        for (let [binKey, rowPalms] of rowBinMap.entries()) {
+            if (rowPalms.length < 2) continue;
+            rowPalms.sort((a, b) => (a.x * cosA + a.y * sinA) - (b.x * cosA + b.y * sinA));
+            const first = rowPalms[0];
+            const last = rowPalms[rowPalms.length - 1];
+
+            const ext = spacing * 0.4;
+            const x1 = first.x - cosA * ext;
+            const y1 = first.y - sinA * ext;
+            const x2 = last.x + cosA * ext;
+            const y2 = last.y + sinA * ext;
+
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        }
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+
     // 7. Missing Tree / Vacant Spot Indicators (Titik Sisipan)
     if (state.showMissingPalms && state.gaps.length > 0) {
         for (let g of state.gaps) {
@@ -1015,6 +1089,13 @@ function setupEventListeners() {
         });
     }
 
+    if (chkRowBearing) {
+        chkRowBearing.addEventListener('change', () => {
+            state.showRowBearing = chkRowBearing.checked;
+            render();
+        });
+    }
+
     chkShowNumbers.addEventListener('change', () => { state.showNumbers = chkShowNumbers.checked; render(); });
     chkShowCircles.addEventListener('change', () => { state.showCircles = chkShowCircles.checked; render(); });
 
@@ -1053,7 +1134,20 @@ function setupEventListeners() {
     if (btnGeo) btnGeo.addEventListener('click', exportGeojson);
     const btnImg = document.getElementById('btn-export-img');
     if (btnImg) btnImg.addEventListener('click', exportAnnotatedImage);
+    if (btnScreenshot) btnScreenshot.addEventListener('click', exportCanvasScreenshot);
     if (btnExportReport) btnExportReport.addEventListener('click', exportReport);
+
+    // Shortcuts panel toggles
+    if (btnShortcutsHelp && shortcutsPanel) {
+        btnShortcutsHelp.addEventListener('click', () => {
+            shortcutsPanel.classList.toggle('hidden');
+        });
+    }
+    if (btnCloseShortcuts && shortcutsPanel) {
+        btnCloseShortcuts.addEventListener('click', () => {
+            shortcutsPanel.classList.add('hidden');
+        });
+    }
 
     // Radar Minimap Viewport Drag / Click Interaction
     if (minimapWrapper) {
@@ -1110,6 +1204,16 @@ function setupEventListeners() {
             }
         }
 
+        // Toggle shortcuts panel on ? or F1
+        if ((e.key === '?' || e.key === 'F1') && !e.repeat) {
+            const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            if (tag !== 'input' && tag !== 'textarea' && shortcutsPanel) {
+                e.preventDefault();
+                shortcutsPanel.classList.toggle('hidden');
+                return;
+            }
+        }
+
         if (e.ctrlKey || e.metaKey) {
             if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd' || e.key === 'Add') {
                 e.preventDefault();
@@ -1120,12 +1224,26 @@ function setupEventListeners() {
             } else if (e.key === '0' || e.code === 'Numpad0') {
                 e.preventDefault();
                 fitToScreen();
+            } else if (e.key === 'y' || e.key === 'Y' || (e.shiftKey && (e.key === 'z' || e.key === 'Z'))) {
+                // Redo (Ctrl+Y or Ctrl+Shift+Z)
+                e.preventDefault();
+                if (state.currentTool === 'edit') {
+                    redoMarkerEdit();
+                }
             } else if (e.key === 'z' || e.key === 'Z') {
                 e.preventDefault();
-                undoPolygonPoint();
+                if (state.currentTool === 'edit') {
+                    undoMarkerEdit();
+                } else {
+                    undoPolygonPoint();
+                }
             }
         } else if (e.key === 'Escape') {
             e.preventDefault();
+            if (shortcutsPanel && !shortcutsPanel.classList.contains('hidden')) {
+                shortcutsPanel.classList.add('hidden');
+                return;
+            }
             resetPolygon(false);
             if (state.isSamplingMode) {
                 state.isSamplingMode = false;
@@ -1649,8 +1767,13 @@ function handleDoubleClick(e) {
     render();
 }
 
-// Manual marker edit
+// Manual marker edit with full Undo/Redo history (Feature D)
 function handleManualMarkerEdit(pt) {
+    // Push current snapshot onto editHistory before applying change
+    state.editHistory.push(JSON.parse(JSON.stringify(state.palms)));
+    // Clear redo future when a new edit is performed
+    state.editFuture = [];
+
     const clickRadius = 15 / state.zoom;
     let deleteIdx = -1;
 
@@ -1681,6 +1804,28 @@ function handleManualMarkerEdit(pt) {
     state.palms.forEach((p, idx) => p.id = idx + 1);
     recalcMetrics();
     render();
+}
+
+function undoMarkerEdit() {
+    if (state.editHistory.length > 0) {
+        // Save current palms onto redo stack
+        state.editFuture.push(JSON.parse(JSON.stringify(state.palms)));
+        // Pop previous state
+        state.palms = state.editHistory.pop();
+        recalcMetrics();
+        render();
+    }
+}
+
+function redoMarkerEdit() {
+    if (state.editFuture.length > 0) {
+        // Save current palms onto undo stack
+        state.editHistory.push(JSON.parse(JSON.stringify(state.palms)));
+        // Pop redo state
+        state.palms = state.editFuture.pop();
+        recalcMetrics();
+        render();
+    }
 }
 
 // Execute Sensus Count
@@ -1714,17 +1859,62 @@ async function runCount() {
         if (data.success) {
             state.palms = data.palms;
             state.healthSummary = data.health_summary || null;
+            state.rowBearing = data.row_bearing || null;
+            state.ageSummary = data.age_summary || null;
+
             statPalms.textContent = data.total_count.toLocaleString();
             statArea.textContent = data.area_info.area_hectares.toFixed(2);
             statSph.textContent = `${data.sph_info.sph} SPH`;
             statStatus.textContent = data.sph_info.status;
             statTime.textContent = `${data.process_time_s}s`;
 
+            // Feature E: Update SPH Progress Bar vs 136 benchmark
+            updateSphBar(data.sph_info.sph);
+
+            // Health card
             if (state.healthSummary && statHealthCard) {
                 statHealthCard.classList.remove('hidden');
                 if (statHealthGreen) statHealthGreen.textContent = `${state.healthSummary.healthy_count} (${state.healthSummary.healthy_pct}%)`;
                 if (statHealthYellow) statHealthYellow.textContent = `${state.healthSummary.stressed_count} (${state.healthSummary.stressed_pct}%)`;
                 if (statHealthRed) statHealthRed.textContent = `${state.healthSummary.critical_count} (${state.healthSummary.critical_pct}%)`;
+            }
+
+            // Feature A: Row bearing info display
+            if (state.rowBearing && state.rowBearing.row_confidence > 0.05 && statRowCard) {
+                statRowCard.classList.remove('hidden');
+                if (statRowBearing) statRowBearing.textContent = `${state.rowBearing.row_bearing_deg}°`;
+                if (statRowConfidence) statRowConfidence.textContent = `${Math.round(state.rowBearing.row_confidence * 100)}%`;
+                if (statRowSecondary) statRowSecondary.textContent = `${state.rowBearing.secondary_deg}°`;
+                if (badgeRowBearing) {
+                    badgeRowBearing.classList.remove('hidden');
+                    badgeRowBearing.textContent = `${state.rowBearing.row_bearing_deg}°`;
+                }
+            } else if (statRowCard) {
+                statRowCard.classList.add('hidden');
+                if (badgeRowBearing) badgeRowBearing.classList.add('hidden');
+            }
+
+            // Feature B: Age summary display
+            if (state.ageSummary && state.ageSummary.classes && statAgeCard) {
+                statAgeCard.classList.remove('hidden');
+                if (statAgeDominant) statAgeDominant.textContent = state.ageSummary.dominant_class;
+                if (statAgeBars) {
+                    statAgeBars.innerHTML = "";
+                    state.ageSummary.classes.forEach(c => {
+                        const row = document.createElement('div');
+                        row.className = "flex items-center justify-between";
+                        row.innerHTML = `
+                            <span class="flex items-center gap-1.5 text-slate-300">
+                                <span class="w-2 h-2 rounded-full inline-block" style="background-color:${c.color}"></span>
+                                <span>${c.label}:</span>
+                            </span>
+                            <span class="font-mono text-white font-semibold">${c.count} <span class="text-slate-400 font-normal">(${c.pct}%)</span></span>
+                        `;
+                        statAgeBars.appendChild(row);
+                    });
+                }
+            } else if (statAgeCard) {
+                statAgeCard.classList.add('hidden');
             }
 
             if (state.showMissingPalms) {
@@ -1798,7 +1988,32 @@ function recalcMetrics() {
         if (areaHa > 0) {
             const sph = Math.round(state.palms.length / areaHa);
             statSph.textContent = `${sph} SPH`;
+            updateSphBar(sph);
+        } else {
+            updateSphBar(0);
         }
+    } else {
+        updateSphBar(0);
+    }
+}
+
+function updateSphBar(sph) {
+    if (!sphBar) return;
+    const maxScale = 200.0;
+    const pct = Math.min(100, Math.max(0, (sph / maxScale) * 100));
+    sphBar.style.width = `${pct}%`;
+
+    // Color-code relative to 136 benchmark
+    if (sph === 0) {
+        sphBar.className = "h-full rounded-full transition-all duration-500 bg-slate-600";
+    } else if (sph < 110) {
+        sphBar.className = "h-full rounded-full transition-all duration-500 bg-rose-500"; // Severe vacancy
+    } else if (sph < 130) {
+        sphBar.className = "h-full rounded-full transition-all duration-500 bg-amber-400"; // Sub-optimal
+    } else if (sph <= 148) {
+        sphBar.className = "h-full rounded-full transition-all duration-500 bg-emerald-400"; // Target commercial range
+    } else {
+        sphBar.className = "h-full rounded-full transition-all duration-500 bg-sky-400"; // High density
     }
 }
 
@@ -1810,9 +2025,34 @@ function resetStats() {
     statTime.textContent = "0.0s";
     statGapsCard.classList.add('hidden');
     if (statHealthCard) statHealthCard.classList.add('hidden');
+    if (statRowCard) statRowCard.classList.add('hidden');
+    if (statAgeCard) statAgeCard.classList.add('hidden');
+    if (badgeRowBearing) badgeRowBearing.classList.add('hidden');
     state.healthSummary = null;
+    state.rowBearing = null;
+    state.ageSummary = null;
+    updateSphBar(0);
     if (analyticsMiniBadge) {
         analyticsMiniBadge.textContent = "0 palms";
+    }
+}
+
+// Feature C: Export current canvas viewport as PNG screenshot
+function exportCanvasScreenshot() {
+    if (!canvas) return;
+    try {
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                alert("Canvas capture failed.");
+                return;
+            }
+            const block = (inputBlockName ? inputBlockName.value.trim() : "") || "viewport";
+            const filename = `palmsentinel_view_${block}_${Date.now()}.png`;
+            downloadBlob(blob, filename);
+        }, 'image/png');
+    } catch (err) {
+        console.error("Screenshot failed:", err);
+        alert("Screenshot export failed: " + err.message);
     }
 }
 

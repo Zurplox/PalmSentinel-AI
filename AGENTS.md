@@ -28,7 +28,7 @@
 3. **Always Run Verification After Any Edits**:
    * For JS: `node -c static/app.js`
    * For Python: `python -m py_compile app.py desktop_app.py engine/detector.py`
-   * Full Audit: `python audit_suite.py` (Must pass all 47 checks 100%, including live `PalmSentinel.exe --check`).
+   * Full Audit: `python audit_suite.py` (Must pass all 49 checks 100%, including live `PalmSentinel.exe --check`).
 4. **Mirroring Rule**:
    * When modifying `F:\PalmSentinel-AI`, copy updated code to `C:\Users\siapu\.gemini\antigravity\scratch\palm-sensus-ai\`.
 

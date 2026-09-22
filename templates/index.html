@@ -18,7 +18,7 @@
             </div>
             <div>
                 <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
-                    PalmSentinel AI <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Pro v2.6</span>
+                    PalmSentinel AI <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Pro v2.7</span>
                 </h1>
                 <p class="text-xs text-slate-400">Enterprise Drone Orthophoto Tree Counter & Plantation Sensus (F: Drive)</p>
             </div>
@@ -288,21 +288,29 @@
                             <input id="chk-density-heatmap" type="checkbox" class="accent-emerald-500 rounded">
                             <span>🔥 Canopy Density Heatmap</span>
                         </label>
+                        <label class="flex items-center space-x-2 cursor-pointer text-slate-300 hover:text-white">
+                            <input id="chk-row-bearing" type="checkbox" class="accent-sky-500 rounded">
+                            <span>🧭 Row Alignment Guide Lines</span>
+                            <span id="badge-row-bearing" class="hidden text-[9px] font-mono text-sky-300 bg-sky-950/60 px-1.5 rounded border border-sky-800/40">0°</span>
+                        </label>
                     </div>
                 </div>
 
                 <!-- 7. EXPORT OPTIONS -->
                 <div class="pt-2 border-t border-slate-800 space-y-2">
                     <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Export Results</label>
-                    <div class="grid grid-cols-3 gap-1.5">
+                    <div class="grid grid-cols-4 gap-1.5">
                         <button id="btn-export-csv" class="export-btn px-2 py-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-center transition">
-                            📊 CSV Table
+                            📊 CSV
                         </button>
                         <button id="btn-export-geojson" class="export-btn px-2 py-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-center transition">
                             🗺️ GeoJSON
                         </button>
                         <button id="btn-export-img" class="export-btn px-2 py-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-center transition">
                             🖼️ Annotated
+                        </button>
+                        <button id="btn-screenshot" class="export-btn px-2 py-2 text-xs bg-slate-800 hover:bg-slate-700 text-sky-300 rounded border border-sky-800/50 text-center transition" title="Save current canvas view as PNG (no server needed)">
+                            📷 PNG
                         </button>
                     </div>
                     <button id="btn-export-report" class="export-btn w-full py-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded border border-emerald-400/40 text-center transition flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40">
@@ -399,6 +407,12 @@
                         <span class="text-slate-400">Stand Density (SPH):</span>
                         <strong id="stat-sph" class="font-mono text-emerald-400 text-sm">0 SPH</strong>
                     </div>
+                    <!-- Feature E: SPH Progress Bar vs 136 benchmark -->
+                    <div class="relative w-full h-1.5 bg-slate-800 rounded-full overflow-hidden" title="SPH vs 136 industry benchmark">
+                        <div id="sph-bar" class="h-full rounded-full transition-all duration-500 bg-slate-600" style="width:0%"></div>
+                        <!-- Benchmark marker at 136/200 = 68% -->
+                        <div class="absolute top-0 bottom-0 w-px bg-white/40" style="left:68%"></div>
+                    </div>
                     <p id="stat-status" class="text-[11px] text-slate-400 leading-tight">
                         Draw an area and click "Run Palm Sensus Count" to evaluate.
                     </p>
@@ -438,6 +452,33 @@
                     </div>
                 </div>
 
+                <!-- Feature B: Age / Maturity Class Breakdown (Appears after count) -->
+                <div id="stat-age-card" class="hidden bg-slate-950 p-2.5 rounded-lg border border-slate-800/80 space-y-1.5">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-300 font-semibold">Age / Maturity Classes</span>
+                        <span id="stat-age-dominant" class="text-[10px] font-mono text-emerald-400">—</span>
+                    </div>
+                    <div id="stat-age-bars" class="space-y-1 text-[10px]">
+                        <!-- Populated dynamically by app.js -->
+                    </div>
+                </div>
+
+                <!-- Feature A: Row Bearing Info (Appears after count) -->
+                <div id="stat-row-card" class="hidden bg-sky-950/30 p-2.5 rounded-lg border border-sky-800/40 space-y-1">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-sky-300 font-semibold">🧭 Row Bearing:</span>
+                        <span id="stat-row-bearing" class="font-mono text-sky-400 text-sm">—</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>Confidence:</span>
+                        <span id="stat-row-confidence" class="font-mono text-sky-300">—</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>Cross-row axis:</span>
+                        <span id="stat-row-secondary" class="font-mono text-sky-300">—</span>
+                    </div>
+                </div>
+
                 <div class="flex items-center justify-between text-[11px] pt-1 border-t border-slate-800 text-slate-400">
                     <label class="flex items-center space-x-1.5 cursor-pointer">
                         <input id="chk-show-numbers" type="checkbox" checked class="accent-emerald-500 rounded">
@@ -447,10 +488,47 @@
                         <input id="chk-show-circles" type="checkbox" checked class="accent-emerald-500 rounded">
                         <span>Show Circles</span>
                     </label>
+                    <button id="btn-shortcuts-help" class="text-slate-500 hover:text-white transition text-xs px-1.5 py-0.5 rounded hover:bg-slate-800" title="Keyboard shortcuts (?)">⌨️ ?</button>
                 </div>
             </div>
         </div>
 
+    </div>
+
+    <!-- Feature F: Keyboard Shortcuts Help Panel -->
+    <div id="shortcuts-panel" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-5 w-80 max-h-[90vh] overflow-y-auto space-y-3 text-xs text-slate-300">
+            <div class="flex items-center justify-between mb-1">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">⌨️ Keyboard Shortcuts</h3>
+                <button id="btn-close-shortcuts" class="text-slate-400 hover:text-white text-lg leading-none">✕</button>
+            </div>
+            <div class="space-y-2">
+                <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wider border-b border-slate-800 pb-1">Navigation</div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Space</span><span>Temporary pan (hold)</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Ctrl +/−</span><span>Zoom in / out</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Ctrl 0</span><span>Fit to screen</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Scroll wheel</span><span>Zoom at cursor</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Dbl-click</span><span>Zoom into point</span></div>
+
+                <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wider border-b border-slate-800 pb-1 pt-1">Polygon Tool</div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Click</span><span>Add polygon vertex</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Drag vertex</span><span>Move vertex (Photoshop)</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Alt + click vertex</span><span>Delete vertex</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Ctrl Z</span><span>Undo last vertex</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Esc</span><span>Reset polygon</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Dbl-click / near start</span><span>Close polygon</span></div>
+
+                <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wider border-b border-slate-800 pb-1 pt-1">Edit Tool</div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Click empty</span><span>Add palm marker</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Click marker</span><span>Delete marker</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Ctrl Z</span><span>Undo marker edit</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Ctrl Y / Ctrl⇧Z</span><span>Redo marker edit</span></div>
+
+                <div class="text-[10px] font-semibold uppercase text-slate-500 tracking-wider border-b border-slate-800 pb-1 pt-1">General</div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">? or F1</span><span>This shortcuts panel</span></div>
+                <div class="flex justify-between"><span class="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">Esc</span><span>Close panel</span></div>
+            </div>
+        </div>
     </div>
 
     <script src="/static/app.js"></script>
